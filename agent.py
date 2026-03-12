@@ -5,7 +5,7 @@ Plant Disease Diagnostic Agent — Truly Agentic, KB-Driven
 Architecture:
   • Vision Agent     — open-ended visual observation extraction (NO schema bias)
   • Diagnostic Agent — reads KB via tools, reasons freely, submits prediction
-  • Judge            — calibration evaluation
+  • Judge            — calibration evaluation (disabled)
 
 Design principles enforced throughout:
   - ZERO hardcoded disease names in any prompt, routing logic, or tool response
@@ -20,7 +20,7 @@ Design principles enforced throughout:
 
 from __future__ import annotations
 
-import os, io, json, base64, re, time, sys, argparse, random, threading
+import os, io, json, base64, re, time, sys, argparse, random
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -48,8 +48,6 @@ IMAGE_EXTS     = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
 MAX_LONG_EDGE  = 1024
 JPEG_QUALITY   = 85
 
-FILES_API_BETA         = "files-api-2025-04-14"
-FILES_BASE_URL         = "https://api.anthropic.com/v1/files"
 MESSAGES_URL           = "https://api.anthropic.com/v1/messages"
 RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
 
@@ -529,7 +527,6 @@ def get_discriminators(disease_a: str, disease_b: str,
             api_key=api_key,
             system=_DISCRIMINATOR_SYSTEM,
             max_retries=4,
-            use_files_beta=False,
         )
         text = extract_text(resp.get("content", []))
         parsed = parse_json(text)
@@ -587,10 +584,6 @@ def compress_image_to_bytes(image_path: str) -> tuple:
         return raw, mt
 
 
-def file_image_block(file_id: str) -> dict:
-    return {"type": "image", "source": {"type": "file", "file_id": file_id}}
-
-
 def inline_image_block(image_path: str) -> dict:
     img_bytes, mime_type = compress_image_to_bytes(image_path)
     data = base64.standard_b64encode(img_bytes).decode("utf-8")
@@ -599,73 +592,19 @@ def inline_image_block(image_path: str) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  FILES API
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _files_headers(api_key: str) -> dict:
-    return {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": FILES_API_BETA,
-    }
-
-
-def upload_image(image_path: str, api_key: str, max_retries: int = 8):
-    img_bytes, mime_type = compress_image_to_bytes(image_path)
-    filename = Path(image_path).stem + ".jpg"
-    wait = 10
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(
-                FILES_BASE_URL,
-                headers=_files_headers(api_key),
-                files={"file": (filename, img_bytes, mime_type)},
-                timeout=60,
-            )
-        except (requests.exceptions.ConnectionError,
-                requests.exceptions.ChunkedEncodingError,
-                requests.exceptions.Timeout):
-            if attempt < max_retries - 1:
-                time.sleep(wait)
-                wait = min(wait * 2, 60)
-                continue
-            return None
-        if resp.status_code == 200:
-            return resp.json().get("id") or None
-        if resp.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries - 1:
-            time.sleep(int(resp.headers.get("retry-after", wait)))
-            wait = min(wait * 2, 60)
-            continue
-        return None
-    return None
-
-
-def delete_file(file_id: str, api_key: str):
-    try:
-        requests.delete(f"{FILES_BASE_URL}/{file_id}",
-                        headers=_files_headers(api_key), timeout=15)
-    except Exception:
-        pass
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  MESSAGES API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _messages_headers(api_key: str, include_files_beta: bool = False) -> dict:
-    h = {
+def _messages_headers(api_key: str) -> dict:
+    return {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
     }
-    if include_files_beta:
-        h["anthropic-beta"] = FILES_API_BETA
-    return h
 
 
 def call_claude_api(messages: list, api_key: str, system: str,
-                    tools: list = None, max_retries: int = 8,
-                    use_files_beta: bool = False) -> dict:
+                    tools: list = None, max_retries: int = 8) -> dict:
     payload = {
         "model": MODEL,
         "max_tokens": MAX_TOKENS,
@@ -680,7 +619,7 @@ def call_claude_api(messages: list, api_key: str, system: str,
         try:
             resp = requests.post(
                 MESSAGES_URL,
-                headers=_messages_headers(api_key, use_files_beta),
+                headers=_messages_headers(api_key),
                 json=payload,
                 timeout=180,
             )
@@ -747,9 +686,8 @@ def find_reference_image(class_name: str, dataset_name: str):
 #  VISION AGENT — Stage 1
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_vision_agent(image_path: str, test_file_id, api_key: str) -> dict:
-    img_block = (file_image_block(test_file_id) if test_file_id
-                 else inline_image_block(image_path))
+def run_vision_agent(image_path: str, api_key: str) -> dict:
+    img_block = inline_image_block(image_path)
 
     messages = [{
         "role": "user",
@@ -765,7 +703,7 @@ def run_vision_agent(image_path: str, test_file_id, api_key: str) -> dict:
         resp = call_claude_api(
             messages, api_key,
             system=VISION_AGENT_PROMPT,
-            use_files_beta=(test_file_id is not None))
+            )
         text = extract_text(resp.get("content", []))
         features = parse_json(text)
         if features:
@@ -784,9 +722,8 @@ def run_vision_agent(image_path: str, test_file_id, api_key: str) -> dict:
 
 def execute_tool(tool_name: str, tool_input: dict,
                  dataset_name: str, expected_classes: list,
-                 symptom_lookup: dict, ref_file_cache: dict,
-                 api_key: str, ref_budget_remaining: int | None = None,
-                 ref_cache_lock: threading.Lock | None = None) -> tuple:
+                 symptom_lookup: dict, api_key: str,
+                 ref_budget_remaining: int | None = None) -> tuple:
 
     if tool_name == "list_dataset_classes":
         text = (
@@ -837,7 +774,7 @@ def execute_tool(tool_name: str, tool_input: dict,
                   "text": f"Reference image budget exhausted (--k limit reached). "
                           "Use read_symptom_description or submit_prediction instead."}],
                 {"tool": tool_name, "class": cls, "ref_image": None,
-                 "file_id": None, "budget_exhausted": True}
+                 "budget_exhausted": True}
             )
         ref_path = find_reference_image(cls, dataset_name)
         if not ref_path:
@@ -845,19 +782,9 @@ def execute_tool(tool_name: str, tool_input: dict,
                 [{"type": "text",
                   "text": f"No reference image found for '{cls}'. "
                           "Try read_symptom_description for its description instead."}],
-                {"tool": tool_name, "class": cls, "ref_image": None, "file_id": None}
+                {"tool": tool_name, "class": cls, "ref_image": None}
             )
-        if ref_cache_lock:
-            with ref_cache_lock:
-                if cls not in ref_file_cache:
-                    ref_file_cache[cls] = upload_image(ref_path, api_key)
-                file_id = ref_file_cache[cls]
-        else:
-            if cls not in ref_file_cache:
-                ref_file_cache[cls] = upload_image(ref_path, api_key)
-            file_id = ref_file_cache[cls]
-        img_block = (file_image_block(file_id) if file_id
-                     else inline_image_block(ref_path))
+        img_block = inline_image_block(ref_path)
         blocks = [
             img_block,
             {"type": "text",
@@ -867,7 +794,7 @@ def execute_tool(tool_name: str, tool_input: dict,
         ]
         return blocks, {
             "tool": tool_name, "class": cls,
-            "ref_image": ref_path, "file_id": file_id
+            "ref_image": ref_path
         }
 
     if tool_name == "inspect_closely":
@@ -934,19 +861,14 @@ def _error_result(trace: list, error_msg: str,
 def classify_with_agent(image_path: str, expected_classes: list,
                         dataset_description: str, symptoms_text: str,
                         dataset_name: str, api_key: str,
-                        ref_file_cache: dict,
-                        max_ref_views: int | None = None,
-                        ref_cache_lock: threading.Lock | None = None) -> dict:
+                        max_ref_views: int | None = None) -> dict:
 
     symptom_lookup = build_symptom_lookup(symptoms_text, dataset_name)
     diagnostic_prompt = build_diagnostic_prompt(MAX_TOOL_CALLS)
 
-    test_file_id = upload_image(image_path, api_key)
-    print(f"[{'file-api' if test_file_id else 'inline-b64'}]", end=" ", flush=True)
-    test_img_block = (file_image_block(test_file_id) if test_file_id
-                      else inline_image_block(image_path))
+    test_img_block = inline_image_block(image_path)
 
-    vision_features = run_vision_agent(image_path, test_file_id, api_key)
+    vision_features = run_vision_agent(image_path, api_key)
     observations_str = json.dumps(vision_features, indent=2) if vision_features else "unavailable"
 
     initial_prompt = (
@@ -987,12 +909,9 @@ def classify_with_agent(image_path: str, expected_classes: list,
                 messages, api_key,
                 system=diagnostic_prompt,
                 tools=TOOLS,
-                use_files_beta=(test_file_id is not None),
             )
         except Exception as e:
             print(f"\n    [API ERROR] {e}", flush=True)
-            if test_file_id:
-                delete_file(test_file_id, api_key)
             return _error_result(trace, str(e), tool_call_count, refs_viewed)
 
         stop_reason    = resp.get("stop_reason", "")
@@ -1023,9 +942,8 @@ def classify_with_agent(image_path: str, expected_classes: list,
             result_blocks, meta = execute_tool(
                 tool_name, tool_input,
                 dataset_name, expected_classes,
-                symptom_lookup, ref_file_cache, api_key,
+                symptom_lookup, api_key,
                 ref_budget_remaining=ref_budget,
-                ref_cache_lock=ref_cache_lock,
             )
 
             trace.append({
@@ -1100,7 +1018,6 @@ def classify_with_agent(image_path: str, expected_classes: list,
                 messages, api_key,
                 system=diagnostic_prompt,
                 tools=TOOLS,
-                use_files_beta=(test_file_id is not None),
             )
             for b in resp.get("content", []):
                 if b.get("type") == "tool_use" and b.get("name") == "submit_prediction":
@@ -1128,9 +1045,6 @@ def classify_with_agent(image_path: str, expected_classes: list,
             prediction = sorted(expected_classes)[0] if expected_classes else "UNKNOWN"
             confidence = 0.25
             reasoning  = f"forced fallback after error: {e}"
-
-    if test_file_id:
-        delete_file(test_file_id, api_key)
 
     return {
         "prediction":       prediction,
@@ -1425,9 +1339,8 @@ def prompt_user_for_datasets() -> list:
 
 def _process_single_image(idx, total, image_path, ground_truth, image_name,
                           expected_classes, dataset_description, symptoms_text,
-                          dataset_name, api_key, ref_file_cache, ref_cache_lock,
-                          max_ref_views, dataset_logs_dir):
-    """Classify one image + judge. Returns a result dict. Thread-safe."""
+                          dataset_name, api_key, max_ref_views, dataset_logs_dir):
+    """Classify one image. Returns a result dict. Thread-safe."""
     print(f"\n[{idx}/{total}] {image_name} | GT: {ground_truth}")
     print("  ", end="", flush=True)
 
@@ -1438,9 +1351,7 @@ def _process_single_image(idx, total, image_path, ground_truth, image_name,
         symptoms_text=symptoms_text,
         dataset_name=dataset_name,
         api_key=api_key,
-        ref_file_cache=ref_file_cache,
         max_ref_views=max_ref_views,
-        ref_cache_lock=ref_cache_lock,
     )
 
     prediction   = result.get("prediction", "UNKNOWN")
@@ -1475,24 +1386,6 @@ def _process_single_image(idx, total, image_path, ground_truth, image_name,
     if reason:
         print(f"    Reason       -> {reason[:200]}")
 
-    print("    Judge        -> ", end="", flush=True)
-    judge_result = run_judge(
-        image_path=image_path,
-        ground_truth=ground_truth,
-        prediction=prediction,
-        confidence=confidence,
-        reasoning_trace=result["trace"],
-        api_key=api_key,
-    )
-    judge_parsed = judge_result.get("parsed", {})
-    verdict      = judge_parsed.get("calibration_verdict", "UNKNOWN")
-    cal_score    = float(judge_parsed.get("calibration_score", 0.0))
-    judge_notes  = judge_parsed.get("judge_notes", "")
-
-    print(f"{verdict}  (cal:{cal_score:.2f})")
-    if judge_notes:
-        print(f"               {judge_notes[:150]}")
-
     log_entry = {
         "image_name":       image_name,
         "ground_truth":     ground_truth,
@@ -1506,13 +1399,6 @@ def _process_single_image(idx, total, image_path, ground_truth, image_name,
         "vision_features":  vf,
         "reasoning_summary": result.get("reasoning_summary", ""),
         "trace":            result.get("trace", []),
-        "judge": {
-            "verdict":               verdict,
-            "calibration_score":     cal_score,
-            "reasoning_consistency": judge_parsed.get("reasoning_consistency", ""),
-            "judge_notes":           judge_notes,
-            "raw":                   judge_result.get("raw", ""),
-        },
         "num_turns":  result.get("num_turns"),
         "success":    result.get("success"),
         "error":      result.get("error"),
@@ -1527,8 +1413,6 @@ def _process_single_image(idx, total, image_path, ground_truth, image_name,
         "is_correct": is_correct,
         "tool_calls": tool_calls,
         "refs_viewed": refs_viewed,
-        "cal_score": cal_score,
-        "verdict": verdict,
     }
 
 
@@ -1567,78 +1451,48 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
     correct     = 0
     total_refs  = 0
     total_tools = 0
-    judge_scores: list = []
-    calibration_counts = {
-        "WELL_CALIBRATED": 0, "OVERCONFIDENT": 0,
-        "UNDERCONFIDENT": 0,  "INCONSISTENT":  0, "UNKNOWN": 0,
-    }
-    ref_file_cache: dict = {}
-    ref_cache_lock = threading.Lock()
 
     def process(idx_and_image):
         idx, (image_path, ground_truth, image_name) = idx_and_image
         return _process_single_image(
             idx, len(test_images), image_path, ground_truth, image_name,
             expected_classes, dataset_description, symptoms_text,
-            dataset_name, api_key, ref_file_cache, ref_cache_lock,
-            max_ref_views, dataset_logs_dir,
+            dataset_name, api_key, max_ref_views, dataset_logs_dir,
         )
 
-    try:
-        if parallel <= 1:
-            # Sequential — same behavior as before
-            image_results = [process((idx, img))
-                             for idx, img in enumerate(test_images, 1)]
-        else:
-            # Parallel
-            with ThreadPoolExecutor(max_workers=parallel) as pool:
-                futures = {
-                    pool.submit(process, (idx, img)): idx
-                    for idx, img in enumerate(test_images, 1)
-                }
-                image_results = []
-                for future in as_completed(futures):
-                    image_results.append(future.result())
+    if parallel <= 1:
+        image_results = [process((idx, img))
+                         for idx, img in enumerate(test_images, 1)]
+    else:
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            futures = {
+                pool.submit(process, (idx, img)): idx
+                for idx, img in enumerate(test_images, 1)
+            }
+            image_results = []
+            for future in as_completed(futures):
+                image_results.append(future.result())
 
-        for r in image_results:
-            if r["is_correct"]:
-                correct += 1
-            total_refs  += len(r["refs_viewed"])
-            total_tools += r["tool_calls"]
-            judge_scores.append(r["cal_score"])
-            verdict = r["verdict"]
-            if verdict in calibration_counts:
-                calibration_counts[verdict] += 1
-
-    finally:
-        if ref_file_cache:
-            print(f"  Cleaning up {len(ref_file_cache)} cached ref files...", end=" ")
-            for fid in ref_file_cache.values():
-                if fid:
-                    delete_file(fid, api_key)
-            print("done")
+    for r in image_results:
+        if r["is_correct"]:
+            correct += 1
+        total_refs  += len(r["refs_viewed"])
+        total_tools += r["tool_calls"]
 
     n         = len(test_images)
     accuracy  = (correct / n) * 100 if n else 0
-    avg_cal   = sum(judge_scores) / len(judge_scores) if judge_scores else 0.0
     avg_refs  = total_refs  / n if n else 0
     avg_tools = total_tools / n if n else 0
 
     print(f"\n  Accuracy         : {correct}/{n} ({accuracy:.1f}%)")
     print(f"  Avg tool calls   : {avg_tools:.1f}  (ceiling: {MAX_TOOL_CALLS})")
     print(f"  Avg ref images   : {avg_refs:.1f}")
-    print(f"  Avg cal. score   : {avg_cal:.2f}")
-    print("  Calibration breakdown:")
-    for v, c in calibration_counts.items():
-        print(f"    {v:<20}: {c}")
     print(f"  Logs             : {dataset_logs_dir}/")
 
     return {
         "accuracy":              accuracy,
-        "avg_calibration_score": avg_cal,
         "avg_ref_turns":         avg_refs,
         "avg_tool_calls":        avg_tools,
-        "calibration_counts":    calibration_counts,
     }
 
 
@@ -1648,13 +1502,13 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
 
 def run_agent(run_config=None, symptom_source="default", max_ref_views=None, parallel=1):
     print("=" * 60)
-    print("AGENTIC CLASSIFICATION  (tool-use + Files API)")
+    print("AGENTIC CLASSIFICATION  (tool-use + inline base64)")
     print(f"  Model         : {MODEL}")
     print(f"  Max tool calls: {MAX_TOOL_CALLS} per image")
     print(f"  Ref image cap : {max_ref_views if max_ref_views is not None else 'unlimited'}")
     print(f"  Symptom source: {symptom_source}")
     print(f"  Image size    : max {MAX_LONG_EDGE}px long edge, JPEG q{JPEG_QUALITY}")
-    print(f"  Image upload  : Files API — upload once, reference by file_id")
+    print(f"  Image format  : inline base64 (JPEG q{JPEG_QUALITY}, max {MAX_LONG_EDGE}px)")
     print("=" * 60)
 
     if not CURATED_DIR.exists():
@@ -1726,13 +1580,6 @@ def run_agent(run_config=None, symptom_source="default", max_ref_views=None, par
         print(f"    Accuracy       : {stats['accuracy']:.1f}%")
         print(f"    Avg tool calls : {stats['avg_tool_calls']:.1f}")
         print(f"    Avg ref images : {stats['avg_ref_turns']:.1f}")
-        print(f"    Avg cal. score : {stats['avg_calibration_score']:.2f}")
-        counts = stats["calibration_counts"]
-        print(f"    Calibration    : "
-              f"WELL={counts['WELL_CALIBRATED']} "
-              f"OVER={counts['OVERCONFIDENT']} "
-              f"UNDER={counts['UNDERCONFIDENT']} "
-              f"INCON={counts['INCONSISTENT']}")
 
     print(f"\nFull logs: {logs_dir}/")
     return all_results
