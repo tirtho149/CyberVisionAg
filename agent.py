@@ -18,9 +18,12 @@ Design principles enforced throughout:
   - Works for ANY crop / disease dataset without code changes
 """
 
-import os, io, json, base64, re, time, sys, argparse, random
+from __future__ import annotations
+
+import os, io, json, base64, re, time, sys, argparse, random, threading
 from pathlib import Path
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import dotenv_values
 import requests
 
@@ -117,7 +120,8 @@ CRITICAL RULES:
 #  STAGE 2: DIAGNOSTIC AGENT
 # ══════════════════════════════════════════════════════════════════════════════
 
-DIAGNOSTIC_AGENT_PROMPT = """\
+def build_diagnostic_prompt(tool_budget: int) -> str:
+    return f"""\
 You are a plant disease diagnostic expert. You have a set of tools that let you \
 query a symptom knowledge base and retrieve reference images.
 
@@ -127,6 +131,9 @@ You will receive:
   3. The list of possible disease classes
 
 Your task: reason carefully and submit exactly one prediction.
+
+You have a budget of {tool_budget} tool calls. Use them fully — do NOT submit \
+early if you have budget remaining and confidence < 0.80.
 
 ══════════════════════════════════════════
 REASONING PROCESS — follow all 5 phases
@@ -147,18 +154,20 @@ Call read_symptom_description for each candidate.
 PHASE 3 — NARROW
 After reading descriptions, compare each against the observations.
 Which candidates clearly don't fit? Eliminate them.
-For your remaining top 2 candidates, call get_disease_discriminators to find \
-the single feature that separates them.
+For your remaining top 2-3 candidates, call get_disease_discriminators for \
+EVERY pair among them (e.g. A vs B, A vs C, B vs C). Do not skip any pair.
 
 PHASE 4 — VISUALLY CONFIRM
-Call get_reference_image for your top 1-2 candidates.
+Call get_reference_image for your top 2-3 candidates (not just 1-2).
 After viewing each, explicitly state:
   MATCH — visual features align well
   PARTIAL MATCH — some features match, some don't; explain what differs
   NO MATCH — clearly different; explain why
-Adjust your confidence accordingly.
+Adjust your ranking accordingly.
 
-PHASE 5 — DECIDE
+PHASE 5 — VERIFY & DECIDE
+Before submitting: if confidence < 0.80 and you have budget remaining, go back \
+and compare your top pick against any candidate you haven't visually confirmed yet.
 Call compare_candidates to log your ruling feature and winner.
 Call submit_prediction with your final answer.
 
@@ -166,12 +175,17 @@ Call submit_prediction with your final answer.
 TOOL USE GUIDANCE
 ══════════════════════════════════════════
 read_symptom_description  — use broadly; read 3-6 descriptions when uncertain
-get_disease_discriminators — use for every pair where you are uncertain
-get_reference_image       — use for your top 1-2 candidates; visual match matters
+get_disease_discriminators — use for EVERY uncertain pair, not just top 2
+get_reference_image       — use for top 2-3 candidates; visual match matters
 inspect_closely           — use when you need to re-examine a specific aspect \
                             of the target image before deciding
 compare_candidates        — ALWAYS call before submit_prediction
 submit_prediction         — MUST be called; never leave without a prediction
+
+Budget strategy: you have {tool_budget} tool calls total. A typical diagnosis \
+uses 3-5 for survey, 2-3 for discriminators, 2-3 for reference images, \
+and 1-2 for inspect/compare/submit. If you finish early, use remaining budget \
+to verify against candidates you haven't fully ruled out.
 
 If the image appears to not be a plant (equipment, test strip, label, etc.):
   • Still call list_dataset_classes and pick the closest class
@@ -771,7 +785,8 @@ def run_vision_agent(image_path: str, test_file_id, api_key: str) -> dict:
 def execute_tool(tool_name: str, tool_input: dict,
                  dataset_name: str, expected_classes: list,
                  symptom_lookup: dict, ref_file_cache: dict,
-                 api_key: str, ref_budget_remaining: int | None = None) -> tuple:
+                 api_key: str, ref_budget_remaining: int | None = None,
+                 ref_cache_lock: threading.Lock | None = None) -> tuple:
 
     if tool_name == "list_dataset_classes":
         text = (
@@ -832,9 +847,15 @@ def execute_tool(tool_name: str, tool_input: dict,
                           "Try read_symptom_description for its description instead."}],
                 {"tool": tool_name, "class": cls, "ref_image": None, "file_id": None}
             )
-        if cls not in ref_file_cache:
-            ref_file_cache[cls] = upload_image(ref_path, api_key)
-        file_id = ref_file_cache[cls]
+        if ref_cache_lock:
+            with ref_cache_lock:
+                if cls not in ref_file_cache:
+                    ref_file_cache[cls] = upload_image(ref_path, api_key)
+                file_id = ref_file_cache[cls]
+        else:
+            if cls not in ref_file_cache:
+                ref_file_cache[cls] = upload_image(ref_path, api_key)
+            file_id = ref_file_cache[cls]
         img_block = (file_image_block(file_id) if file_id
                      else inline_image_block(ref_path))
         blocks = [
@@ -914,9 +935,11 @@ def classify_with_agent(image_path: str, expected_classes: list,
                         dataset_description: str, symptoms_text: str,
                         dataset_name: str, api_key: str,
                         ref_file_cache: dict,
-                        max_ref_views: int | None = None) -> dict:
+                        max_ref_views: int | None = None,
+                        ref_cache_lock: threading.Lock | None = None) -> dict:
 
     symptom_lookup = build_symptom_lookup(symptoms_text, dataset_name)
+    diagnostic_prompt = build_diagnostic_prompt(MAX_TOOL_CALLS)
 
     test_file_id = upload_image(image_path, api_key)
     print(f"[{'file-api' if test_file_id else 'inline-b64'}]", end=" ", flush=True)
@@ -962,7 +985,7 @@ def classify_with_agent(image_path: str, expected_classes: list,
         try:
             resp = call_claude_api(
                 messages, api_key,
-                system=DIAGNOSTIC_AGENT_PROMPT,
+                system=diagnostic_prompt,
                 tools=TOOLS,
                 use_files_beta=(test_file_id is not None),
             )
@@ -1002,6 +1025,7 @@ def classify_with_agent(image_path: str, expected_classes: list,
                 dataset_name, expected_classes,
                 symptom_lookup, ref_file_cache, api_key,
                 ref_budget_remaining=ref_budget,
+                ref_cache_lock=ref_cache_lock,
             )
 
             trace.append({
@@ -1074,7 +1098,7 @@ def classify_with_agent(image_path: str, expected_classes: list,
         try:
             resp = call_claude_api(
                 messages, api_key,
-                system=DIAGNOSTIC_AGENT_PROMPT,
+                system=diagnostic_prompt,
                 tools=TOOLS,
                 use_files_beta=(test_file_id is not None),
             )
@@ -1399,10 +1423,120 @@ def prompt_user_for_datasets() -> list:
     return run_config
 
 
+def _process_single_image(idx, total, image_path, ground_truth, image_name,
+                          expected_classes, dataset_description, symptoms_text,
+                          dataset_name, api_key, ref_file_cache, ref_cache_lock,
+                          max_ref_views, dataset_logs_dir):
+    """Classify one image + judge. Returns a result dict. Thread-safe."""
+    print(f"\n[{idx}/{total}] {image_name} | GT: {ground_truth}")
+    print("  ", end="", flush=True)
+
+    result = classify_with_agent(
+        image_path=image_path,
+        expected_classes=expected_classes,
+        dataset_description=dataset_description,
+        symptoms_text=symptoms_text,
+        dataset_name=dataset_name,
+        api_key=api_key,
+        ref_file_cache=ref_file_cache,
+        max_ref_views=max_ref_views,
+        ref_cache_lock=ref_cache_lock,
+    )
+
+    prediction   = result.get("prediction", "UNKNOWN")
+    confidence   = result.get("confidence", 0.0)
+    tool_calls   = result.get("tool_call_count", 0)
+    refs_viewed  = result.get("refs_viewed", [])
+    syms_read    = result.get("symptoms_read", [])
+    comparisons  = result.get("comparisons", [])
+    is_correct   = (prediction == ground_truth)
+
+    print(f"\n  GT={ground_truth} | Pred={prediction} | "
+          f"{'✓' if is_correct else '✗'} "
+          f"(conf:{confidence:.2f} tools:{tool_calls})")
+    if refs_viewed:
+        print(f"    Refs viewed  -> {refs_viewed}")
+    if syms_read:
+        print(f"    Syms read    -> {syms_read}")
+    if comparisons:
+        print(f"    Comparisons  -> {comparisons}")
+
+    vf = result.get("vision_features", {})
+    if vf:
+        print(f"    Vision       -> "
+              f"organ={vf.get('primary_organ_affected','?')} "
+              f"stage={vf.get('approximate_growth_stage','?')}")
+
+    final_entry = next(
+        (e for e in reversed(result["trace"])
+         if e.get("phase") == "final_prediction"), {}
+    )
+    reason = final_entry.get("parsed", {}).get("reasoning", "")
+    if reason:
+        print(f"    Reason       -> {reason[:200]}")
+
+    print("    Judge        -> ", end="", flush=True)
+    judge_result = run_judge(
+        image_path=image_path,
+        ground_truth=ground_truth,
+        prediction=prediction,
+        confidence=confidence,
+        reasoning_trace=result["trace"],
+        api_key=api_key,
+    )
+    judge_parsed = judge_result.get("parsed", {})
+    verdict      = judge_parsed.get("calibration_verdict", "UNKNOWN")
+    cal_score    = float(judge_parsed.get("calibration_score", 0.0))
+    judge_notes  = judge_parsed.get("judge_notes", "")
+
+    print(f"{verdict}  (cal:{cal_score:.2f})")
+    if judge_notes:
+        print(f"               {judge_notes[:150]}")
+
+    log_entry = {
+        "image_name":       image_name,
+        "ground_truth":     ground_truth,
+        "prediction":       prediction,
+        "correct":          is_correct,
+        "confidence":       confidence,
+        "tool_call_count":  tool_calls,
+        "refs_viewed":      refs_viewed,
+        "symptoms_read":    syms_read,
+        "comparisons_made": comparisons,
+        "vision_features":  vf,
+        "reasoning_summary": result.get("reasoning_summary", ""),
+        "trace":            result.get("trace", []),
+        "judge": {
+            "verdict":               verdict,
+            "calibration_score":     cal_score,
+            "reasoning_consistency": judge_parsed.get("reasoning_consistency", ""),
+            "judge_notes":           judge_notes,
+            "raw":                   judge_result.get("raw", ""),
+        },
+        "num_turns":  result.get("num_turns"),
+        "success":    result.get("success"),
+        "error":      result.get("error"),
+        "timestamp":  datetime.now().isoformat(),
+    }
+    log_file = dataset_logs_dir / f"{Path(image_name).stem}_log.json"
+    with open(log_file, "w") as f:
+        json.dump(log_entry, f, indent=2)
+    print()
+
+    return {
+        "is_correct": is_correct,
+        "tool_calls": tool_calls,
+        "refs_viewed": refs_viewed,
+        "cal_score": cal_score,
+        "verdict": verdict,
+    }
+
+
 def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
                          symptoms_text: str, api_key: str,
                          selected_classes=None, images_per_class=None,
-                         max_ref_views: int | None = None) -> dict:
+                         max_ref_views: int | None = None,
+                         parallel: int = 1) -> dict:
 
     expected_classes = get_expected_classes(dataset_name, selected_classes)
     if not expected_classes:
@@ -1423,6 +1557,8 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
     print(f"Dataset : {dataset_name}")
     print(f"Classes : {len(expected_classes)}")
     print(f"Images  : {len(test_images)}")
+    if parallel > 1:
+        print(f"Parallel: {parallel} workers")
     print(f"{'='*60}")
 
     dataset_logs_dir = logs_dir / dataset_name
@@ -1437,110 +1573,42 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
         "UNDERCONFIDENT": 0,  "INCONSISTENT":  0, "UNKNOWN": 0,
     }
     ref_file_cache: dict = {}
+    ref_cache_lock = threading.Lock()
+
+    def process(idx_and_image):
+        idx, (image_path, ground_truth, image_name) = idx_and_image
+        return _process_single_image(
+            idx, len(test_images), image_path, ground_truth, image_name,
+            expected_classes, dataset_description, symptoms_text,
+            dataset_name, api_key, ref_file_cache, ref_cache_lock,
+            max_ref_views, dataset_logs_dir,
+        )
 
     try:
-        for idx, (image_path, ground_truth, image_name) in enumerate(test_images, 1):
-            print(f"\n[{idx}/{len(test_images)}] {image_name} | GT: {ground_truth}")
-            print("  ", end="", flush=True)
+        if parallel <= 1:
+            # Sequential — same behavior as before
+            image_results = [process((idx, img))
+                             for idx, img in enumerate(test_images, 1)]
+        else:
+            # Parallel
+            with ThreadPoolExecutor(max_workers=parallel) as pool:
+                futures = {
+                    pool.submit(process, (idx, img)): idx
+                    for idx, img in enumerate(test_images, 1)
+                }
+                image_results = []
+                for future in as_completed(futures):
+                    image_results.append(future.result())
 
-            result = classify_with_agent(
-                image_path=image_path,
-                expected_classes=expected_classes,
-                dataset_description=dataset_description,
-                symptoms_text=symptoms_text,
-                dataset_name=dataset_name,
-                api_key=api_key,
-                ref_file_cache=ref_file_cache,
-                max_ref_views=max_ref_views,
-            )
-
-            prediction   = result.get("prediction", "UNKNOWN")
-            confidence   = result.get("confidence", 0.0)
-            tool_calls   = result.get("tool_call_count", 0)
-            refs_viewed  = result.get("refs_viewed", [])
-            syms_read    = result.get("symptoms_read", [])
-            comparisons  = result.get("comparisons", [])
-            is_correct   = (prediction == ground_truth)
-
-            if is_correct:
+        for r in image_results:
+            if r["is_correct"]:
                 correct += 1
-            total_refs  += len(refs_viewed)
-            total_tools += tool_calls
-
-            print(f"\n  GT={ground_truth} | Pred={prediction} | "
-                  f"{'✓' if is_correct else '✗'} "
-                  f"(conf:{confidence:.2f} tools:{tool_calls})")
-            if refs_viewed:
-                print(f"    Refs viewed  -> {refs_viewed}")
-            if syms_read:
-                print(f"    Syms read    -> {syms_read}")
-            if comparisons:
-                print(f"    Comparisons  -> {comparisons}")
-
-            vf = result.get("vision_features", {})
-            if vf:
-                print(f"    Vision       -> "
-                      f"organ={vf.get('primary_organ_affected','?')} "
-                      f"stage={vf.get('approximate_growth_stage','?')}")
-
-            final_entry = next(
-                (e for e in reversed(result["trace"])
-                 if e.get("phase") == "final_prediction"), {}
-            )
-            reason = final_entry.get("parsed", {}).get("reasoning", "")
-            if reason:
-                print(f"    Reason       -> {reason[:200]}")
-
-            print("    Judge        -> ", end="", flush=True)
-            judge_result = run_judge(
-                image_path=image_path,
-                ground_truth=ground_truth,
-                prediction=prediction,
-                confidence=confidence,
-                reasoning_trace=result["trace"],
-                api_key=api_key,
-            )
-            judge_parsed = judge_result.get("parsed", {})
-            verdict      = judge_parsed.get("calibration_verdict", "UNKNOWN")
-            cal_score    = float(judge_parsed.get("calibration_score", 0.0))
-            judge_notes  = judge_parsed.get("judge_notes", "")
-
+            total_refs  += len(r["refs_viewed"])
+            total_tools += r["tool_calls"]
+            judge_scores.append(r["cal_score"])
+            verdict = r["verdict"]
             if verdict in calibration_counts:
                 calibration_counts[verdict] += 1
-            judge_scores.append(cal_score)
-            print(f"{verdict}  (cal:{cal_score:.2f})")
-            if judge_notes:
-                print(f"               {judge_notes[:150]}")
-
-            log_entry = {
-                "image_name":       image_name,
-                "ground_truth":     ground_truth,
-                "prediction":       prediction,
-                "correct":          is_correct,
-                "confidence":       confidence,
-                "tool_call_count":  tool_calls,
-                "refs_viewed":      refs_viewed,
-                "symptoms_read":    syms_read,
-                "comparisons_made": comparisons,
-                "vision_features":  vf,
-                "reasoning_summary": result.get("reasoning_summary", ""),
-                "trace":            result.get("trace", []),
-                "judge": {
-                    "verdict":               verdict,
-                    "calibration_score":     cal_score,
-                    "reasoning_consistency": judge_parsed.get("reasoning_consistency", ""),
-                    "judge_notes":           judge_notes,
-                    "raw":                   judge_result.get("raw", ""),
-                },
-                "num_turns":  result.get("num_turns"),
-                "success":    result.get("success"),
-                "error":      result.get("error"),
-                "timestamp":  datetime.now().isoformat(),
-            }
-            log_file = dataset_logs_dir / f"{Path(image_name).stem}_log.json"
-            with open(log_file, "w") as f:
-                json.dump(log_entry, f, indent=2)
-            print()
 
     finally:
         if ref_file_cache:
@@ -1578,7 +1646,7 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
 #  MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_agent(run_config=None, symptom_source="default", max_ref_views=None):
+def run_agent(run_config=None, symptom_source="default", max_ref_views=None, parallel=1):
     print("=" * 60)
     print("AGENTIC CLASSIFICATION  (tool-use + Files API)")
     print(f"  Model         : {MODEL}")
@@ -1644,6 +1712,7 @@ def run_agent(run_config=None, symptom_source="default", max_ref_views=None):
             selected_classes=cfg.get("classes"),
             images_per_class=cfg.get("images_per_class"),
             max_ref_views=max_ref_views,
+            parallel=parallel,
         )
         all_results[cfg["dataset"]] = stats
 
@@ -1685,6 +1754,10 @@ def parse_args():
                         help="Shortcut: sets num-classes=N, images-per-class=1")
     parser.add_argument("--k", type=int, default=None,
                         help="Max get_reference_image calls per image")
+    parser.add_argument("--parallel", type=int, default=1,
+                        help="Number of images to process concurrently (default: 1)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for class selection (default: 42)")
     return parser.parse_args()
 
 
@@ -1699,6 +1772,7 @@ if __name__ == "__main__":
         images_per_class = 1
 
     # Build run_config from CLI args
+    random.seed(args.seed)
     selected_classes = None
     if num_classes is not None:
         all_classes = get_expected_classes(args.dataset)
@@ -1717,4 +1791,5 @@ if __name__ == "__main__":
         run_config=run_config,
         symptom_source=args.symptom_source,
         max_ref_views=args.k,
+        parallel=args.parallel,
     )
