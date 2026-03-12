@@ -9,7 +9,7 @@ set -a && source .env && set +a
 for src in default local internet; do
   PYTHONUNBUFFERED=1 python -m CyberVisionAg.agent \
     --symptom-source $src --num-classes 5 --images-per-class 5 \
-    --parallel 12 --seed 42 \
+    --k 4 --parallel 12 --seed 42 \
     > /tmp/agent_${src}.log 2>&1 &
   echo "$src PID: $!"
 done

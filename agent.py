@@ -43,7 +43,7 @@ SYMPTOMS_FILE = Path(__file__).parent / "disease_symptoms_crop_wise.md"
 
 MODEL          = "claude-sonnet-4-6"
 MAX_TOKENS     = 4096
-MAX_TOOL_CALLS = 16
+MAX_TOOL_CALLS = 64
 IMAGE_EXTS     = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
 MAX_LONG_EDGE  = 1024
 JPEG_QUALITY   = 85
@@ -118,7 +118,8 @@ CRITICAL RULES:
 #  STAGE 2: DIAGNOSTIC AGENT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_diagnostic_prompt(tool_budget: int) -> str:
+def build_diagnostic_prompt(tool_budget: int, ref_budget: int | None = None) -> str:
+    ref_budget_str = str(ref_budget) if ref_budget is not None else "unlimited"
     return f"""\
 You are a plant disease diagnostic expert. You have a set of tools that let you \
 query a symptom knowledge base and retrieve reference images.
@@ -156,7 +157,7 @@ For your remaining top 2-3 candidates, call get_disease_discriminators for \
 EVERY pair among them (e.g. A vs B, A vs C, B vs C). Do not skip any pair.
 
 PHASE 4 — VISUALLY CONFIRM
-Call get_reference_image for your top 2-3 candidates (not just 1-2).
+You have {ref_budget_str} reference image views. Use ALL of them.
 After viewing each, explicitly state:
   MATCH — visual features align well
   PARTIAL MATCH — some features match, some don't; explain what differs
@@ -174,16 +175,17 @@ TOOL USE GUIDANCE
 ══════════════════════════════════════════
 read_symptom_description  — use broadly; read 3-6 descriptions when uncertain
 get_disease_discriminators — use for EVERY uncertain pair, not just top 2
-get_reference_image       — use for top 2-3 candidates; visual match matters
+get_reference_image       — you have {ref_budget_str} reference image views; USE THEM ALL
 inspect_closely           — use when you need to re-examine a specific aspect \
                             of the target image before deciding
 compare_candidates        — ALWAYS call before submit_prediction
 submit_prediction         — MUST be called; never leave without a prediction
 
-Budget strategy: you have {tool_budget} tool calls total. A typical diagnosis \
-uses 3-5 for survey, 2-3 for discriminators, 2-3 for reference images, \
-and 1-2 for inspect/compare/submit. If you finish early, use remaining budget \
-to verify against candidates you haven't fully ruled out.
+Budget strategy: you have {tool_budget} tool calls total and {ref_budget_str} \
+reference image views. You MUST use all {ref_budget_str} reference image views — \
+view your top candidates AND any runner-ups you haven't ruled out. \
+Do NOT submit until you've used your full reference image budget. \
+Remaining tool calls: use for symptom reads, discriminators, and inspect.
 
 If the image appears to not be a plant (equipment, test strip, label, etc.):
   • Still call list_dataset_classes and pick the closest class
@@ -864,7 +866,7 @@ def classify_with_agent(image_path: str, expected_classes: list,
                         max_ref_views: int | None = None) -> dict:
 
     symptom_lookup = build_symptom_lookup(symptoms_text, dataset_name)
-    diagnostic_prompt = build_diagnostic_prompt(MAX_TOOL_CALLS)
+    diagnostic_prompt = build_diagnostic_prompt(MAX_TOOL_CALLS, max_ref_views)
 
     test_img_block = inline_image_block(image_path)
 
