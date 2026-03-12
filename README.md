@@ -1,137 +1,190 @@
-# Plant Disease Classification Agent (Claude API)
+# CyberAG: Plant Disease Classification & Dataset Toolkit
 
-## Overview
+## ✅ What this project is
 
-This project implements a multi-turn, agentic plant disease classification pipeline using the Anthropic Claude API. The agent reasons step-by-step, can request reference images, and is evaluated for confidence calibration. The workflow matches the AGENT_FLOW.md specification and supports reproducible, fair benchmarking across multiple crops and disease classes.
+**CyberAG** is a research toolkit for building and evaluating **agentic plant disease diagnosis systems**. It includes:
 
-## Features
+- A **multi-turn LLM agent** that reasons about plant images using a knowledge base and reference images.
+- A **confidence calibration judge** that checks whether the agent's stated confidence matches its reasoning.
+- A **dataset curation and reporting pipeline** to build reproducible train/test splits from local and public sources.
+- A **Streamlit dashboard** for exploration, symptom generation, and running the agent interactively.
 
-- **Multi-turn agentic reasoning**: The agent can request reference images and re-evaluate its prediction.
-- **Crop-wise knowledge base**: Disease symptom descriptions are parsed from `disease_symptoms_crop_wise.md` and injected into prompts.
-- **Image handling**: Images are encoded to base64 and sent to Claude for visual reasoning.
-- **Confidence calibration**: After prediction, an LLM-as-judge scores the agent's confidence calibration.
-- **Flexible dataset selection**: Interactive or programmatic selection of datasets, classes, and images.
-- **Logs and evaluation**: All results, traces, and calibration scores are saved for analysis.
+> This repo is designed for flexible experimentation: you can run the full agent pipeline, generate disease symptom knowledge, curate datasets, and inspect results from the same codebase.
 
-## Directory Structure
+---
 
-```
-Curated_Local_Dataset/
-├── train/   # Reference images for each class
-├── test/    # Test images for each class
-results/
-└── agent/   # Logs and outputs
-knowledge_docs/
-├── disease_symptoms_crop_wise.md  # Crop-wise symptom descriptions
-```
+## 🗂️ Repository Structure (key folders)
 
-## Setup
+- `agent.py` — Core agent pipeline (vision reasoning + diagnostic reasoning + judge).
+- `app.py` — Streamlit dashboard (Generate Symptoms, Run Agent, Expert Validation, About).
+- `dataloader.py` / `data_loader.py` — Dataset curation + reporting from local and online sources.
+- `generate_symptoms.py` — Generates symptom knowledge (Markdown + registry) from the crop registry.
+- `performance_analysis.py` — Generates evaluation summaries (confusion matrices, calibration breakdowns, per-crop/organ stats) from agent logs.
+- `Curated_Dataset/` — Generated dataset structure used by the agent:
+  - `Reference_Image/` (train/reference)
+  - `Benchmark/` (test/eval)
+- `crop_disease_registry_updated.xlsx` — Master knowledge base used by the agent.
+- `results/agent/` — Agent run logs & evaluation outputs.
 
-1. **Install dependencies**:
+---
 
-   - Python 3.8+
-   - `pip install anthropic python-dotenv Pillow requests`
+## 🚀 Getting Started (Quickstart)
 
-2. **Prepare datasets**:
+### 1) Create a Python environment
 
-   - Place your train/test images in `Curated_Local_Dataset/train/<dataset>/<class>/` and `Curated_Local_Dataset/test/<dataset>/<class>/`.
-   - Ensure `disease_symptoms_crop_wise.md` is present in the project root.
-
-3. **Configure API key**:
-   - Add your Claude API key to `.env`:
-     ```
-     ANTHROPIC_API_KEY=sk-ant-...
-     ```
-
-## Usage
-
-### Interactive mode
-
-Run the agent and select datasets/classes/images interactively:
-
-```
-python run_agent.py
+```bash
+python -m venv .venv
+source .venv/bin/activate
 ```
 
-### Programmatic mode
+### 2) Install dependencies
 
-Specify datasets/classes/images in code:
-
-```python
-run_agent(run_config=[
-    {
-        "dataset": "Corn_Diseases",
-        "classes": ["Common_rust", "Gray_leaf_spot", "Tar_spot"],
-        "images_per_class": 3,
-    },
-    {
-        "dataset": "Soybean_Diseases",
-        "classes": None,    # all classes
-        "images_per_class": 2,
-    },
-])
+```bash
+pip install -r requirements.txt
 ```
 
-## Agent Flow
+> If `requirements.txt` is missing, install the key packages below:
 
-1. **Turn 1**: Agent receives prompt, knowledge base, and target image. Makes initial prediction and states confidence.
-2. **Reference loop**: If confidence is low or ambiguous, agent requests reference images for top candidate classes and re-reasons (up to `MAX_REFERENCE_TURNS`).
-3. **Final turn**: Agent must return a valid prediction JSON.
-4. **Judge**: LLM-as-judge evaluates confidence calibration and reasoning consistency.
+```bash
+pip install anthropic python-dotenv streamlit pillow requests pandas openpyxl reportlab
+```
 
-## Output
+### 3) Configure API keys
 
-- Logs for each image are saved in `results/agent/logs/<dataset>/`.
-- Each log includes prediction, confidence, reference turns, reasoning trace, and judge verdict.
-- Summary statistics are printed at the end of each run.
+Create a `.env` file in the repo root with your Anthropic Claude key:
 
-## Python Scripts
+```bash
+echo "ANTHROPIC_API_KEY=sk-..." > .env
+```
 
-This repository includes multiple Python scripts for plant disease classification, dataset preparation, visualization, and analysis:
+---
 
-- `run_agent.py` — Multi-turn agentic classification pipeline using Claude API. Handles reasoning, reference image injection, confidence calibration, and logging.
-- `dataloader.py` — Loads and preprocesses datasets for training and testing.
-- `dataVisualizer.py` — Visualizes dataset distributions and sample images.
-- `dataDirectoryVisual.py` — Directory structure visualization and summary tools.
-- `generate_symptoms.py` — Generates crop-wise disease symptom markdown using GPT-4.
-- `leafnet.py` — Computes image-level overlap between Hugging Face datasets (LeafNet, LeafBench) using hashing.
-- `leafnetPreview.py` — Preview and analysis of LeafNet dataset images.
+## 🧠 Running the Agent (CLI)
 
-## Additional Files
+The main agent pipeline is in `agent.py`.
 
-- `disease_symptoms_crop_wise.md` — Crop-wise symptom descriptions for agent prompts.
-- `Curated_Local_Dataset/` — Contains train/test splits for each crop and disease class.
-- `knowledge_docs/` — Additional reference documents and spreadsheets.
+```bash
+python agent.py
+```
 
-## How to Use
+The agent will:
 
-- See the main instructions above for running the agent and preparing datasets.
-- Use the visualization and dataloader scripts for exploratory analysis and preprocessing.
-- Use `leafnet.py` for dataset overlap analysis.
+- Load the crop/disease registry (`crop_disease_registry_updated.xlsx`) as its knowledge base.
+- Read test images from `Curated_Dataset/Benchmark/<Crop>/<Disease>/`.
+- Reason using a vision prompt + diagnostic prompt.
+- Optionally fetch reference images from `Curated_Dataset/Reference_Image/<Crop>/<Disease>/`.
+- Save logs to `results/agent/logs/<Crop>/`.
 
-## Project Structure
+### 📌 Notes
 
-See the directory structure section above for details on folders and files.
+- If `Curated_Dataset/` or the registry XLSX are missing, the agent will exit with an error.
+- The agent expects `ANTHROPIC_API_KEY` to be set in the environment.
 
-## Customization
+---
 
-- Edit `disease_symptoms_crop_wise.md` to update symptom descriptions.
-- Adjust `MAX_REFERENCE_TURNS` and `MODEL` in `run_agent.py` as needed.
-- Add new crops/diseases by updating the directory structure and markdown.
+## 🧩 Running the Streamlit Dashboard
 
-## Troubleshooting
+```bash
+streamlit run app.py
+```
 
-- Ensure your API key is valid and set in `.env`.
-- If images are too large, Pillow will resize/compress them automatically.
-- Rate limits (429) are handled with exponential backoff.
+The dashboard provides:
 
-## License
+- Symptom generation & editing
+- Dataset exploration (what images exist where)
+- Agent execution (run the agent without CLI prompts)
+- Expert validation views
 
-This project is for research and benchmarking purposes. See individual dataset licenses for image usage.
+---
 
-## Credits
+## 🗃️ Dataset Curation
 
-- Anthropic Claude API
-- Plant disease datasets (see `Curated_Local_Dataset`)
-- GPT-4 for knowledge base generation
-# CyberVisionAg
+### Generate / Refresh Curated Dataset
+
+Use `dataloader.py` to create curated reference + benchmark splits from local and online sources.
+
+```bash
+python dataloader.py
+```
+
+This script can ingest:
+
+- Local folders (configured in `LOCAL_SOURCE_ROOT` inside `dataloader.py`)
+- Public datasets (Kaggle, HuggingFace, etc.) when dependencies and credentials are present.
+
+### Output layout
+
+```
+Curated_Dataset/
+  Reference_Image/<Crop>/<Disease>/*.jpg
+  Benchmark/<Crop>/<Disease>/*.jpg
+```
+
+---
+
+## 📄 Key Knowledge Files
+
+- `crop_disease_registry_updated.xlsx` — master crop/disease registry used by the agent.
+- `generate_symptoms.py` — builds symptom prompts / Markdown from the registry.
+- `knowledge_docs/` — additional reference docs (e.g., `soybean-compressed.pdf`).
+
+---
+
+## 🧪 Evaluation & Results
+
+Agent run outputs are stored under:
+
+- `results/agent/logs/<Crop>/` — per-image logs, reasoning trace, confidence, judge verdict.
+- `results/agent/vision_organ_breakdown.csv` — aggregated math (if generated by runs).
+
+### 📈 Performance Evaluation
+
+Use `performance_analysis.py` to generate higher-level evaluation tables and reports from agent logs:
+
+```bash
+python performance_analysis.py
+python performance_analysis.py --logs results/agent/logs --db crop_disease_registry_updated.xlsx
+python performance_analysis.py --ablation web
+```
+
+This produces:
+
+- Confusion matrices (`confusion_matrix_<crop>.csv`, `confusion_matrix_overall.csv`)
+- Calibration breakdown (`calibration_breakdown.csv`)
+- Tool usage stats (`tool_usage_stats.csv`)
+- Per-crop / pathogen performance (`performance_by_crop.csv`, `performance_by_pathogen.csv`, etc.)
+- A PDF summary report (`performance_report.pdf`)
+
+---
+
+## 🛠️ Customization
+
+- Update the registry spreadsheet (`crop_disease_registry_updated.xlsx`) to add new crops/diseases.
+- Adjust agent parameters in `agent.py` (e.g., model choice, max tool calls, image resize settings).
+- Modify symptom text generation in `generate_symptoms.py`.
+
+---
+
+## 🧩 Helpful Commands
+
+| Purpose                    | Command                          |
+| -------------------------- | -------------------------------- |
+| Run agent (CLI)            | `python agent.py`                |
+| Run dashboard              | `streamlit run app.py`           |
+| Generate symptom KB        | `python generate_symptoms.py`    |
+| Run performance evaluation | `python performance_analysis.py` |
+| Curate datasets            | `python dataloader.py`           |
+
+---
+
+## 📌 Troubleshooting
+
+- **Missing dataset files**: Ensure `Curated_Dataset/` exists and follows the expected structure.
+- **Missing API key**: Make sure `.env` has `ANTHROPIC_API_KEY` and it is loaded.
+- **Rate limits**: The agent retries on 429/503 errors but may still fail if limits are hit.
+
+---
+
+## ⚖️ License
+
+This repository is intended for research and benchmarking. Individual image datasets may have their own licenses; consult the source datasets.
