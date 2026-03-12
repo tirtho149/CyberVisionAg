@@ -18,7 +18,7 @@ Design principles enforced throughout:
   - Works for ANY crop / disease dataset without code changes
 """
 
-import os, io, json, base64, re, time, sys
+import os, io, json, base64, re, time, sys, argparse, random
 from pathlib import Path
 from datetime import datetime
 from dotenv import dotenv_values
@@ -416,6 +416,40 @@ def parse_symptoms_by_crop(symptoms_text: str) -> dict:
     return parsed
 
 
+REGISTRY_OUTPUTS_DIR = Path(__file__).resolve().parent.parent / "disease_registry" / "outputs"
+
+
+def load_symptoms_from_xlsx(source: str, crop: str, dataset_name: str) -> str:
+    """Load symptoms from disease_registry xlsx and convert to markdown format."""
+    import openpyxl
+
+    xlsx_path = REGISTRY_OUTPUTS_DIR / f"{crop}_{source}.xlsx"
+    if not xlsx_path.exists():
+        print(f"\nERROR: xlsx not found: {xlsx_path}")
+        sys.exit(1)
+
+    wb = openpyxl.load_workbook(xlsx_path, read_only=True)
+    ws = wb.active
+
+    lines = [f"## Crop: {dataset_name.replace('_', ' ')}\n"]
+    count = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        disease_name = row[0]  # Col A
+        visual_desc = row[4]   # Col E (Visual Description)
+        if not disease_name:
+            continue
+        underscored = disease_name.strip().replace(" ", "_")
+        lines.append(f"### {underscored}\n")
+        lines.append("**Symptoms:**")
+        lines.append(visual_desc.strip() if visual_desc else "(no description available)")
+        lines.append("")
+        count += 1
+
+    wb.close()
+    print(f"\nKB source: {xlsx_path.name} ({count} diseases loaded)")
+    return "\n".join(lines)
+
+
 def build_symptom_lookup(symptoms_text: str, dataset_name: str) -> dict:
     all_syms = parse_symptoms_by_crop(symptoms_text)
     norm = dataset_name.replace("_", " ").lower()
@@ -737,7 +771,7 @@ def run_vision_agent(image_path: str, test_file_id, api_key: str) -> dict:
 def execute_tool(tool_name: str, tool_input: dict,
                  dataset_name: str, expected_classes: list,
                  symptom_lookup: dict, ref_file_cache: dict,
-                 api_key: str) -> tuple:
+                 api_key: str, ref_budget_remaining: int | None = None) -> tuple:
 
     if tool_name == "list_dataset_classes":
         text = (
@@ -782,6 +816,14 @@ def execute_tool(tool_name: str, tool_input: dict,
 
     if tool_name == "get_reference_image":
         cls = tool_input.get("class_name", "")
+        if ref_budget_remaining is not None and ref_budget_remaining <= 0:
+            return (
+                [{"type": "text",
+                  "text": f"Reference image budget exhausted (--k limit reached). "
+                          "Use read_symptom_description or submit_prediction instead."}],
+                {"tool": tool_name, "class": cls, "ref_image": None,
+                 "file_id": None, "budget_exhausted": True}
+            )
         ref_path = find_reference_image(cls, dataset_name)
         if not ref_path:
             return (
@@ -871,7 +913,8 @@ def _error_result(trace: list, error_msg: str,
 def classify_with_agent(image_path: str, expected_classes: list,
                         dataset_description: str, symptoms_text: str,
                         dataset_name: str, api_key: str,
-                        ref_file_cache: dict) -> dict:
+                        ref_file_cache: dict,
+                        max_ref_views: int | None = None) -> dict:
 
     symptom_lookup = build_symptom_lookup(symptoms_text, dataset_name)
 
@@ -906,6 +949,7 @@ def classify_with_agent(image_path: str, expected_classes: list,
 
     trace: list       = []
     tool_call_count   = 0
+    ref_view_count    = 0
     prediction        = "UNKNOWN"
     confidence        = 0.0
     reasoning         = ""
@@ -951,10 +995,13 @@ def classify_with_agent(image_path: str, expected_classes: list,
             tool_id    = tu.get("id", "")
             tool_call_count += 1
 
+            ref_budget = (max_ref_views - ref_view_count
+                         if max_ref_views is not None else None)
             result_blocks, meta = execute_tool(
                 tool_name, tool_input,
                 dataset_name, expected_classes,
                 symptom_lookup, ref_file_cache, api_key,
+                ref_budget_remaining=ref_budget,
             )
 
             trace.append({
@@ -968,6 +1015,8 @@ def classify_with_agent(image_path: str, expected_classes: list,
 
             if tool_name == "get_reference_image":
                 cls = tool_input.get("class_name", "")
+                if not meta.get("budget_exhausted"):
+                    ref_view_count += 1
                 if cls and cls not in refs_viewed:
                     refs_viewed.append(cls)
                 print(f"[ref:{cls[:10]}]", end=" ", flush=True)
@@ -1352,7 +1401,8 @@ def prompt_user_for_datasets() -> list:
 
 def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
                          symptoms_text: str, api_key: str,
-                         selected_classes=None, images_per_class=None) -> dict:
+                         selected_classes=None, images_per_class=None,
+                         max_ref_views: int | None = None) -> dict:
 
     expected_classes = get_expected_classes(dataset_name, selected_classes)
     if not expected_classes:
@@ -1401,6 +1451,7 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
                 dataset_name=dataset_name,
                 api_key=api_key,
                 ref_file_cache=ref_file_cache,
+                max_ref_views=max_ref_views,
             )
 
             prediction   = result.get("prediction", "UNKNOWN")
@@ -1527,22 +1578,19 @@ def run_agent_on_dataset(dataset_name: str, logs_dir: Path,
 #  MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run_agent(run_config=None):
+def run_agent(run_config=None, symptom_source="default", max_ref_views=None):
     print("=" * 60)
     print("AGENTIC CLASSIFICATION  (tool-use + Files API)")
     print(f"  Model         : {MODEL}")
     print(f"  Max tool calls: {MAX_TOOL_CALLS} per image")
+    print(f"  Ref image cap : {max_ref_views if max_ref_views is not None else 'unlimited'}")
+    print(f"  Symptom source: {symptom_source}")
     print(f"  Image size    : max {MAX_LONG_EDGE}px long edge, JPEG q{JPEG_QUALITY}")
     print(f"  Image upload  : Files API — upload once, reference by file_id")
-    print(f"  Tools         : read_symptom_description, get_reference_image,")
-    print(f"                  list_dataset_classes, submit_prediction")
     print("=" * 60)
 
     if not CURATED_DIR.exists():
         print(f"\nERROR: Curated dataset not found: {CURATED_DIR}")
-        return
-    if not SYMPTOMS_FILE.exists():
-        print(f"\nERROR: Symptoms file not found: {SYMPTOMS_FILE}")
         return
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -1556,11 +1604,34 @@ def run_agent(run_config=None):
             print("No datasets selected. Exiting.")
             return
 
-    symptoms_text = load_symptoms()
-    print(f"\nKnowledge base   : {SYMPTOMS_FILE} ({len(symptoms_text):,} chars)")
+    # Load KB based on symptom source
+    dataset_name = run_config[0]["dataset"]
+    if symptom_source == "default":
+        if not SYMPTOMS_FILE.exists():
+            print(f"\nERROR: Symptoms file not found: {SYMPTOMS_FILE}")
+            return
+        symptoms_text = load_symptoms()
+        print(f"\nKnowledge base   : {SYMPTOMS_FILE.name} ({len(symptoms_text):,} chars)")
+    else:
+        crop = dataset_name.replace("_Diseases", "").replace("_Disease", "")
+        symptoms_text = load_symptoms_from_xlsx(symptom_source, crop, dataset_name)
+        print(f"  KB size: {len(symptoms_text):,} chars")
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    logs_dir = RESULTS_DIR / "logs"
+    # Print KB coverage against dataset classes
+    lookup = build_symptom_lookup(symptoms_text, dataset_name)
+    expected = get_expected_classes(dataset_name)
+    if expected:
+        matched = [c for c in expected if lookup.get(c) or lookup.get(c.replace(" ", "_"))]
+        missing = [c for c in expected if c not in matched]
+        print(f"  KB coverage: {len(matched)}/{len(expected)} diseases have symptom text")
+        if missing:
+            print(f"  Missing KB entries: {', '.join(missing[:10])}"
+                  + (f" (+{len(missing)-10} more)" if len(missing) > 10 else ""))
+
+    # Results dir separated by source
+    results_base = Path(__file__).parent / "results" / "agent" / symptom_source
+    results_base.mkdir(parents=True, exist_ok=True)
+    logs_dir = results_base / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     all_results: dict = {}
@@ -1572,6 +1643,7 @@ def run_agent(run_config=None):
             api_key=api_key,
             selected_classes=cfg.get("classes"),
             images_per_class=cfg.get("images_per_class"),
+            max_ref_views=max_ref_views,
         )
         all_results[cfg["dataset"]] = stats
 
@@ -1597,14 +1669,52 @@ def run_agent(run_config=None):
     return all_results
 
 
-if __name__ == "__main__":
-    run_agent()
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Agentic plant disease classification")
+    parser.add_argument("--symptom-source", default="default",
+                        choices=["default", "local", "internet"],
+                        help="KB source: default (markdown), local (PDF xlsx), internet (web xlsx)")
+    parser.add_argument("--dataset", default="Soybean_Diseases",
+                        help="Dataset folder name under Curated_Local_Dataset/")
+    parser.add_argument("--num-classes", type=int, default=None,
+                        help="Limit to N random classes")
+    parser.add_argument("--images-per-class", type=int, default=None,
+                        help="Test images per class")
+    parser.add_argument("--quick-test", type=int, default=None, metavar="N",
+                        help="Shortcut: sets num-classes=N, images-per-class=1")
+    parser.add_argument("--k", type=int, default=None,
+                        help="Max get_reference_image calls per image")
+    return parser.parse_args()
 
-    # ── Programmatic usage ────────────────────────────────────────────────────
-    # run_agent(run_config=[
-    #     {
-    #         "dataset":          "Soybean_Diseases",
-    #         "classes":          None,   # None = all classes
-    #         "images_per_class": 3,
-    #     },
-    # ])
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    # --quick-test is a shortcut
+    num_classes = args.num_classes
+    images_per_class = args.images_per_class
+    if args.quick_test is not None:
+        num_classes = args.quick_test
+        images_per_class = 1
+
+    # Build run_config from CLI args
+    selected_classes = None
+    if num_classes is not None:
+        all_classes = get_expected_classes(args.dataset)
+        if all_classes and num_classes < len(all_classes):
+            selected_classes = sorted(random.sample(all_classes, num_classes))
+        else:
+            selected_classes = all_classes
+
+    run_config = [{
+        "dataset": args.dataset,
+        "classes": selected_classes,
+        "images_per_class": images_per_class,
+    }]
+
+    run_agent(
+        run_config=run_config,
+        symptom_source=args.symptom_source,
+        max_ref_views=args.k,
+    )
