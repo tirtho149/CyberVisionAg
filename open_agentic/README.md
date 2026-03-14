@@ -1,0 +1,305 @@
+# Open Agentic Pipeline — Evolving Plan
+
+> **This document is a living plan.** It evolves with each iteration. Lessons learned, failed experiments, and metric changes are recorded here so future development builds on past findings.
+
+## Goal
+
+Replace the fixed-pipeline agent (`agent.py`) with a **true agentic classifier** powered by `claude -p` (headless Claude Code). Instead of a hardcoded multi-stage pipeline with prescribed phases, each prediction is an autonomous Claude agent that:
+
+- Receives a test image + access to reference images and symptom KB
+- Freely reasons, reads files, and views images using Claude Code's native tools
+- Submits a structured prediction when ready
+
+The hypothesis: a free-form reasoning agent with access to symptoms and reference images can outperform both few-shot baselines and the current rigid pipeline, because it can adaptively allocate attention based on diagnostic difficulty.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Harness  (eval.py)                             │
+│  - Loads dataset (train/test splits)            │
+│  - Loads KB (default / local / internet xlsx)   │
+│  - Spawns N parallel `claude -p` subprocesses   │
+│  - Parses stream-json traces                    │
+│  - Computes metrics (accuracy, turns, cost)     │
+│  - Writes per-image logs + summary              │
+└──────────────┬──────────────────────────────────┘
+               │  one subprocess per test image
+               ▼
+┌─────────────────────────────────────────────────┐
+│  Claude -p Agent  (one per image)               │
+│  - Model: claude-sonnet-4-6                     │
+│  - Allowed tools: Read (for images + files)     │
+│  - System prompt: task description + constraints │
+│  - User message: test image + class list + KB   │
+│  - Budget: max K reference image views          │
+│  - Output: prediction JSON in final response    │
+└─────────────────────────────────────────────────┘
+```
+
+### How the agent works
+
+Each `claude -p` call receives:
+1. **Test image** — passed as a file path; the agent reads it via the `Read` tool
+2. **Class list** — all disease class names (from folder names)
+3. **Symptom KB** — full symptom text for all classes, embedded in the prompt
+4. **Reference image paths** — the agent knows where train images live and can `Read` them
+5. **Budget** — stated in the prompt: "you may view at most K reference images"
+6. **Output format** — the agent must end its response with a JSON block: `{"prediction": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
+
+The agent is free to reason in any order. No prescribed phases. It can:
+- Read symptoms first, then view images
+- View images first, then check symptoms
+- Compare multiple candidates side-by-side
+- Skip classes it's confident about
+
+### Key differences from current agent.py
+
+| Aspect | Current (`agent.py`) | Open Agentic |
+|--------|---------------------|--------------|
+| Agent runtime | Anthropic API tool-use loop in Python | `claude -p` subprocess (Claude Code) |
+| Reasoning structure | 5 hardcoded phases (ORIENT→SURVEY→NARROW→CONFIRM→VERIFY) | Free-form, prompt-guided |
+| Tools | Custom Python tool handlers | Claude Code native tools (Read, etc.) |
+| Image access | Base64 inline in API messages | File paths, agent reads via `Read` tool |
+| Traces | Custom trace list in Python | `stream-json` NDJSON from claude CLI |
+| Cost tracking | Token counting from API response | `total_cost_usd` from result event |
+
+## Eval Configuration (matches run_eval.sh)
+
+| Parameter | Value |
+|-----------|-------|
+| `--symptom-source` | `none`, `default`, `local`, `internet` |
+| `--num-classes` | 5 |
+| `--images-per-class` | 5 |
+| `--k` | 4 (max reference image views) |
+| `--parallel` | 12 |
+| `--seed` | 42 |
+| Dataset | `Soybean_Diseases` (32 classes) |
+
+### Metrics
+
+- **Accuracy** — primary metric (correct / total)
+- **Per-class accuracy** — to identify weak spots
+- **Avg turns** (`num_turns` from stream-json result)
+- **Avg cost** (`total_cost_usd` from stream-json result)
+- **Avg duration** (`duration_ms` from stream-json result)
+- **Refs viewed** — count of reference image `Read` calls in trace
+- **Error rate** — subprocess failures / timeouts
+
+## KB Sources & Comparison Axes
+
+All KB sources are **filtered to the target crop only** (e.g., soybean). Never send the full multi-crop file.
+
+| Source | Description | Origin |
+|--------|-------------|--------|
+| `none` | No KB — agent uses only reference images | — |
+| `local` | PDF-extracted symptom descriptions | `disease_registry/outputs/Soybean_local.xlsx` |
+| `internet` | Web-extracted symptom descriptions | `disease_registry/outputs/Soybean_internet.xlsx` |
+
+The comparison tests whether curated KB (local from PDF, internet from web) outperforms images-only (none). GPT-generated KB (`disease_symptoms_crop_wise.md`) is excluded — unverifiable, and experiments show it adds cost without clear benefit.
+
+**Few-shot baseline** (existing code in `CyberVisionAg/few_shot_eval.py`) is a separate comparison axis — no agent, just k random labeled images in context.
+
+### KB Coverage (Soybean, 32 classes total)
+
+| Source | Classes with data | Notable gaps |
+|--------|-------------------|--------------|
+| local | 26/32 | Diaporthe_2015_Kanawha, Green_stem_disorder, Stem_Canker, + 3 |
+| internet | 23/32 | Rhizoctonia, SCN, Downy_mildew, + 6 |
+
+Coverage matters: classes without KB data are effectively in "none" mode regardless of source.
+
+## File Structure
+
+```
+CyberVisionAg/open_agentic/
+├── README.md           # This file — evolving plan + experiment log
+├── __init__.py         # Package marker
+├── eval.py             # Agentic harness: claude -p dispatch, metrics
+├── few_shot.py         # Few-shot baseline: single API call, no tools
+├── prompt.py           # Prompt construction (system + user message)
+└── run_eval.sh         # Quick eval launcher
+```
+
+### Run commands
+
+```bash
+# From AgCrawler/ root:
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+
+# Quick smoke test (2 classes, 1 image each)
+python -m CyberVisionAg.open_agentic.eval --symptom-source default --quick-test 2
+
+# 5x5 eval with reference budget
+python -m CyberVisionAg.open_agentic.eval --symptom-source default \
+  --num-classes 5 --images-per-class 5 --k 4 --parallel 12 --seed 42
+
+# A/B eval (all 3 KB sources)
+bash CyberVisionAg/open_agentic/run_eval.sh
+```
+
+## Development Approach — Iterative with Feedback
+
+This pipeline is built **one piece at a time**, tested at each step, with metrics driving the next change. The development cycle:
+
+```
+1. Make a small change (prompt tweak, architecture change)
+2. Run minimal test (2 classes, 1 image each — ~30 seconds)
+3. Check metrics (accuracy, turns, cost)
+4. Record findings in this README under "Experiment Log"
+5. Decide next change based on findings
+6. Repeat
+```
+
+**Rules for iteration:**
+- Never make multiple changes at once — isolate variables
+- Always run the smoke test before committing a change
+- Record ALL findings, including failures — they prevent repeating mistakes
+- Update the plan section when direction changes
+- Keep prompt changes versioned in this log
+
+## Implementation Phases
+
+### Phase 1: Minimal viable agent (done)
+- [x] `eval.py` — harness that spawns one `claude -p` call for a single test image
+- [x] `prompt.py` — construct the system/user prompt with test image, class list, KB, budget
+- [x] Parse `stream-json` output → extract prediction, trace, cost, turns
+- [x] Smoke test: 1 class, 1 image — produces valid prediction (Experiment 1)
+- [x] Add parallel dispatch (ThreadPoolExecutor, like current agent.py)
+- [x] Add CLI args matching current eval: `--symptom-source`, `--k`, `--num-classes`, `--images-per-class`, `--parallel`, `--seed`, `--quick-test`
+- [x] `run_eval.sh` — launcher script
+- [x] Smoke test: 3 classes, 1 image, parallel — works (Experiment 2-3)
+- [x] Filename leakage prevention (test images copied to neutral temp name)
+- [x] `--verbose` flag required with `stream-json` (discovered during Experiment 1)
+
+### Phase 2: KB comparison + failure analysis (done)
+- [x] 10-class eval with none/local/internet KB (Experiments 11-13)
+- [x] KB coverage tracking (local 8/10, internet 7/10)
+- [x] Failure analysis — visual ambiguity is the core challenge
+- [x] Budget experiments — more refs doesn't help (Experiments 8-10)
+- [x] Prompt experiments — prescriptive strategies don't help, reverted to minimal
+
+### Phase 3: Scale, baselines, and refinement (in progress)
+- [ ] More images per class (10x5) for stable estimates
+- [ ] Few-shot baseline comparison on same classes
+- [ ] Full 32-class eval
+- [ ] Investigate multi-reference per class (agent sees diverse examples)
+- [ ] Cost/accuracy tradeoff analysis
+
+## Experiment Log
+
+> Record every test run here. Format:
+> ```
+> ### Experiment N — [date] — [one-line description]
+> **Change**: what was changed
+> **Config**: classes/images/k/source
+> **Results**: accuracy, turns, cost
+> **Finding**: what was learned
+> **Next**: what to try next
+> ```
+
+### Experiments 1-3 — 2026-03-14 — Pipeline bring-up
+- Smoke tests (1 class, 3 classes, sequential + parallel)
+- Validated: pipeline works, parallel works, predictions are reasonable
+- Discovered: `--verbose` required with `stream-json`
+- 5-class results: 72-80% accuracy (easy classes inflate this)
+
+### Experiments 4-7 — 2026-03-14 — 5-class eval + prompt tuning
+- 5 classes too easy: Bacterial_Blight and Green_stem_disorder always 100%
+- KB impact marginal at 5-class scale (all sources in 68-80% noise band)
+- "Compare all candidates" prompt strategy: minor improvement, unreliable
+- **Lesson**: 5 classes inflates accuracy. Need harder test.
+
+### Experiments 8-10 — 2026-03-14 — 10-class scaling + budget tests
+- Accuracy drops to ~37% with 10 classes (vs 72-80% with 5)
+- Agent views only 2-3 refs regardless of budget (k=4 or k=10)
+- Forced minimum refs (must view 5+): accuracy unchanged, just costs more
+- **Lesson**: More reference views ≠ better accuracy. The bottleneck is reasoning quality, not data access.
+
+### Experiments 11-13 — 2026-03-14 — 10-class KB comparison (main result)
+
+**Config**: 10 classes, 3 images each, k=4, parallel=12, seed=42
+
+| Source | Coverage | Accuracy | Cost/img | Avg turns | Avg refs |
+|--------|----------|----------|----------|-----------|----------|
+| **none** | 0/10 | **23%** (7/30) | $0.07 | 4.9 | 2.9 |
+| **local** | 8/10 | **47%** (14/30) | $0.08 | 4.2 | 2.2 |
+| **internet** | 7/10 | **37%** (11/30) | $0.07 | 4.1 | 2.1 |
+
+Per-class breakdown:
+
+| Class | none | local | internet | local KB? | internet KB? |
+|-------|------|-------|----------|-----------|--------------|
+| Anthracnose | 0% | 33% | 33% | yes | yes |
+| Bean_Pod_Mottle_virus | 67% | 33% | 67% | yes | yes |
+| Brown_Stem_Rot | 33% | 67% | 33% | yes | yes |
+| Diaporthe | 0% | 0% | 0% | yes | yes |
+| Diaporthe_2015_Kanawha | 0% | 0% | 0% | NO | NO |
+| Rhizoctonia | 100% | 100% | 100% | yes | NO |
+| Soybean_Cyst_Nematode | 0% | 33% | 0% | yes | NO |
+| Stem_Canker | 0% | 33% | 0% | NO | yes |
+| Tobacco_Streak_Virus | 0% | 67% | 33% | yes | yes |
+| White_Mold | 33% | 100% | 100% | yes | yes |
+
+**Key findings**:
+1. **KB nearly doubles accuracy** (23% → 47% with local)
+2. **Local > Internet** (47% vs 37%) — PDF-quality descriptions + better coverage
+3. **4 classes always 0%** (Diaporthe, D_2015_K) — visually ambiguous, resist all approaches
+4. **2 classes always 100%** (Rhizoctonia, White_Mold) — visually distinctive regardless of KB
+5. **KB helps most for medium-difficulty classes** (TSV 0→67%, White_Mold 33→100%, SCN 0→33%)
+6. **Agent uses 2-3 refs and 4-5 turns** regardless of budget — self-regulates
+7. **Cost nearly identical** across sources (~$0.07-0.08/image)
+
+### Failure analysis (10-class)
+
+**Hard confusion patterns** (visual ambiguity between diseases):
+- **SCN, BSR, Diaporthe** → all show interveinal chlorosis. Agent defaults to BSR.
+- **Diaporthe ↔ Phomopsis/Stem_Canker** → same genus, overlapping stem/pod symptoms.
+- **TSV** → diverse presentations each resemble a different disease.
+
+**One ref image per class is limiting**: each class shows ONE visual presentation. Diseases with variable symptoms (stems vs pods vs leaves) can't be captured by a single example.
+
+### Experiment 14 — 2026-03-14 — Few-shot baseline (10 classes)
+
+**Config**: 10 classes, 3 images each, k=4 random labeled examples, parallel=12, seed=42
+
+| Approach | Accuracy | Cost/img |
+|----------|----------|----------|
+| **Few-shot** (k=4 random) | **27%** (8/30) | $0.02 |
+| **Agentic + none** (images only) | **23%** (7/30) | $0.07 |
+| **Agentic + internet KB** | **37%** (11/30) | $0.07 |
+| **Agentic + local KB** | **47%** (14/30) | $0.08 |
+
+Per-class comparison:
+
+| Class | Few-shot | Agentic none | Agentic local | Agentic internet |
+|-------|----------|-------------|---------------|-----------------|
+| Anthracnose | 0% | 0% | 33% | 33% |
+| Bean_Pod_Mottle_virus | 67% | 67% | 33% | 67% |
+| Brown_Stem_Rot | 67% | 33% | 67% | 33% |
+| Diaporthe | 0% | 0% | 0% | 0% |
+| Diaporthe_2015_Kanawha | 0% | 0% | 0% | 0% |
+| Rhizoctonia | 67% | 100% | 100% | 100% |
+| Soybean_Cyst_Nematode | 33% | 0% | 33% | 0% |
+| Stem_Canker | 0% | 0% | 33% | 0% |
+| Tobacco_Streak_Virus | 0% | 0% | 67% | 33% |
+| White_Mold | 33% | 33% | 100% | 100% |
+
+**Key findings**:
+1. **Agentic + local KB beats few-shot by 20 percentage points** (47% vs 27%)
+2. KB helps most for "medium" classes: TSV (0→67%), White_Mold (33→100%), BSR (33→67%)
+3. Both Diaporthe classes remain at 0% across ALL approaches — genuinely hard
+4. Few-shot is 4x cheaper per image ($0.02 vs $0.08) but significantly worse
+5. Agentic without KB ≈ few-shot (23% vs 27%) — KB is the differentiator
+
+**Next**: Improve accuracy further — investigate multi-reference images, prompt refinement for hard cases, scale to more images per class.
+
+## Claude -p Reference
+
+See [claude-headless.md](../claude-headless.md) for `claude -p` invocation patterns, output parsing, and environment setup.
+
+Key gotchas from existing codebase (`shared.py`):
+- Must strip `CLAUDE*`, `CURSOR*`, `MCP_CONNECTION*`, `VSCODE*`, `ELECTRON*` env vars — otherwise `claude -p` hangs (nested session detection)
+- Use `Popen` with `start_new_session=True` + `os.killpg()` for reliable timeout/cleanup
+- `--output-format stream-json` gives NDJSON with `assistant` events (tool calls, text) and a final `result` event with `num_turns`, `total_cost_usd`, `duration_ms`
