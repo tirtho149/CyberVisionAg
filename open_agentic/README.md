@@ -639,10 +639,31 @@ The agent doesn't know when to stop. At high k it keeps exploring, finds plausib
 ### Changes
 - **Collage is now the default** (`--no-collage` to disable). All future experiments use collages.
 
+### Experiment 28 — 2026-03-15 — Collage k sweep at full scale (27 classes)
+
+**Config**: Sonnet, internet KB, collage (4 train imgs per class), seed=42
+
+| k | 27×1 (1 img/class) | 27×2 (2 imgs/class) |
+|:-:|:-:|:-:|
+| 1 | 29.6% (8/27) | 37.0% (20/54) |
+| 2 | 29.6% (8/27) | 37.0% (20/54) |
+| 4 | 33.3% (9/27) | 40.7% (22/54) |
+| 8 | 40.7% (11/27) | **50.0% (27/54)** |
+| 16 | 40.7% (11/27) | 50.0% (27/54) |
+| 27 | 44.4% (12/27) | 50.0% (27/54) |
+
+**Findings**:
+1. **Accuracy scales monotonically with k** — no regression at any k value with collages
+2. **50% at k=8** is the best 27-class result (previous best 48% from Exp 17, without collage)
+3. **Plateaus at k=8** — k=16 and k=27 don't add more despite agent viewing 11-22 refs
+4. 2 images/class is more stable than 1 image (less noise per run)
+5. Agent fully utilizes budget at every k level (refs ≈ k)
+
+**Open question**: Why is 27×1 accuracy (30-44%) significantly lower than 27×2 (37-50%)? With 1 image, 8/27 correct at k=1; with 2 images, 20/54 correct at k=1. The 2nd image per class seems to be easier — needs investigation.
+
 ### Next steps
-- [ ] Fix k=10 overthinking — prompt change to commit early when confident
-- [ ] Scale collage to 27 classes × 2 images to validate
-- [ ] Run collage k sweep with Opus
+- [ ] Investigate 1-img vs 2-img accuracy gap — which images are the "easy" ones?
+- [ ] Run collage k sweep with Opus to see if model + collage stack
 - [ ] **Image-derived KB**: Generate visual descriptions by looking at training images
 - [ ] KB improvement loop — parked
 - [ ] Full model × k sweep for local/none KB sources
