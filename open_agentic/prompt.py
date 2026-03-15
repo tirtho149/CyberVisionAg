@@ -4,9 +4,15 @@
 def build_system_prompt() -> str:
     """Short role-setting system prompt appended to Claude Code defaults."""
     return (
-        "You are an expert plant pathologist classifying a diseased plant image. "
-        "Examine the test image, compare against reference images and symptom "
-        "descriptions, and submit your prediction.\n\n"
+        "You are an expert plant pathologist classifying a diseased plant image.\n\n"
+        "## Strategy\n"
+        "1. Read the test image first. Note the affected plant part (leaf, stem, pod, "
+        "root, whole plant) and key visual features (color, shape, pattern, texture).\n"
+        "2. Review the symptom descriptions below to narrow candidates — identify "
+        "classes whose descriptions match your visual observations.\n"
+        "3. View reference images for your top candidates (use your full budget). "
+        "Compare carefully — look for the specific feature that distinguishes each.\n"
+        "4. Submit your prediction.\n\n"
         "End your response with exactly this JSON block:\n"
         "```json\n"
         '{"prediction": "<class_name>", "confidence": <0.0-1.0>, '
@@ -47,9 +53,13 @@ def build_user_message(
 
     # Reference images
     if k is not None:
-        budget_note = f"You may view at most **{k}** of these."
+        min_refs = max(1, int(k * 0.8))  # must use ~80% of budget
+        budget_note = (
+            f"Budget: at most **{k}** views. "
+            f"You MUST view at least **{min_refs}** reference images before submitting."
+        )
     else:
-        budget_note = "No limit, but be efficient."
+        budget_note = "View as many as needed to be confident."
     ref_lines = "\n".join(
         f"- **{cls}**: `{path}`" for cls, path in sorted(ref_images.items())
     )

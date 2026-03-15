@@ -125,6 +125,7 @@ def load_dataset(
     num_classes: int | None,
     images_per_class: int | None,
     seed: int,
+    exclude: set[str] | None = None,
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """Discover classes and test images.
 
@@ -143,6 +144,7 @@ def load_dataset(
     all_classes = sorted([
         d.name for d in test_dataset_dir.iterdir()
         if d.is_dir() and not d.name.startswith(".")
+        and (not exclude or d.name not in exclude)
     ])
 
     # Select subset
@@ -356,7 +358,7 @@ def _parse_stream_json(stdout: str) -> tuple[list[dict], dict]:
                 if c.get("type") == "text" and c.get("text", "").strip():
                     trace.append({
                         "type": "text",
-                        "content": c["text"].strip()[:500],  # truncate for logs
+                        "content": c["text"].strip(),
                     })
                 elif c.get("type") == "tool_use":
                     trace.append({
@@ -549,6 +551,8 @@ def main():
                         help="Random seed (default: 42)")
     parser.add_argument("--timeout", type=int, default=TIMEOUT_S,
                         help=f"Per-image timeout in seconds (default: {TIMEOUT_S})")
+    parser.add_argument("--exclude", type=str, default=None,
+                        help="Comma-separated class names to exclude")
     args = parser.parse_args()
 
     # Quick-test shortcut
@@ -556,9 +560,11 @@ def main():
         args.num_classes = args.quick_test
         args.images_per_class = 1
 
+    exclude = set(args.exclude.split(",")) if args.exclude else None
+
     # Load dataset
     classes, test_images = load_dataset(
-        args.dataset, args.num_classes, args.images_per_class, args.seed
+        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
     )
     ref_images = find_reference_images(args.dataset, classes)
 

@@ -45,7 +45,7 @@ Respond with JSON only (no markdown, no preamble):
 
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
-def load_dataset(dataset, num_classes, images_per_class, seed):
+def load_dataset(dataset, num_classes, images_per_class, seed, exclude=None):
     """Discover test classes and images (same logic as eval.py)."""
     test_dir = TEST_DIR / dataset
     if not test_dir.exists():
@@ -54,6 +54,7 @@ def load_dataset(dataset, num_classes, images_per_class, seed):
     all_classes = sorted([
         d.name for d in test_dir.iterdir()
         if d.is_dir() and not d.name.startswith(".")
+        and (not exclude or d.name not in exclude)
     ])
 
     rng = random.Random(seed)
@@ -197,14 +198,18 @@ def main():
                         help="Total labeled example images per API call (default: 4)")
     parser.add_argument("--parallel", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--exclude", type=str, default=None,
+                        help="Comma-separated class names to exclude")
     args = parser.parse_args()
 
     if args.quick_test:
         args.num_classes = args.quick_test
         args.images_per_class = 1
 
+    exclude = set(args.exclude.split(",")) if args.exclude else None
+
     classes, test_images = load_dataset(
-        args.dataset, args.num_classes, args.images_per_class, args.seed
+        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
     )
     train_pool = collect_train_pool(args.dataset, classes)
 

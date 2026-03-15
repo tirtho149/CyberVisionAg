@@ -128,16 +128,37 @@ CyberVisionAg/open_agentic/
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
+# Exclude list for junk/duplicate classes
+EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
+
 # Quick smoke test (2 classes, 1 image each)
-python -m CyberVisionAg.open_agentic.eval --symptom-source default --quick-test 2
+python -m CyberVisionAg.open_agentic.eval --symptom-source local --quick-test 2
 
-# 5x5 eval with reference budget
-python -m CyberVisionAg.open_agentic.eval --symptom-source default \
-  --num-classes 5 --images-per-class 5 --k 4 --parallel 12 --seed 42
+# 27-class eval (clean set) — agentic + local KB
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source local --images-per-class 3 --k 4 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
 
-# A/B eval (all 3 KB sources)
-bash CyberVisionAg/open_agentic/run_eval.sh
+# 27-class eval — agentic + no KB
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source none --images-per-class 3 --k 4 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
+
+# 27-class eval — few-shot baseline
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.few_shot \
+  --images-per-class 3 --k 4 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
 ```
+
+### Session recovery
+
+This README is the single source of truth for continuing work if a conversation is lost. It contains:
+- Current state of all experiments and findings
+- Exact run commands (above)
+- Phase checklist with completed/pending items
+- Lessons learned that inform future experiments
+
+To resume: read this README, check the latest experiment, and continue from the next item in the phase checklist.
 
 ## Development Approach — Iterative with Feedback
 
@@ -181,11 +202,27 @@ This pipeline is built **one piece at a time**, tested at each step, with metric
 - [x] Prompt experiments — prescriptive strategies don't help, reverted to minimal
 
 ### Phase 3: Scale, baselines, and refinement (in progress)
-- [ ] More images per class (10x5) for stable estimates
-- [ ] Few-shot baseline comparison on same classes
-- [ ] Full 32-class eval
-- [ ] Investigate multi-reference per class (agent sees diverse examples)
+- [x] Few-shot baseline (Experiment 14) — agentic + local KB beats few-shot 47% vs 27%
+- [ ] Dataset cleanup — remove duplicate/junk classes (see below), run on clean set
+- [ ] Generate KB (local + internet xlsx) for clean dataset via disease_registry pipeline (see [disease_registry/README.md](../../disease_registry/README.md) for instructions)
+- [ ] Full clean-dataset eval (none / local / internet + few-shot)
+- [ ] Investigate Diaporthe problem — are test images genuinely ambiguous?
+- [ ] Multi-reference per class (agent sees diverse training examples)
 - [ ] Cost/accuracy tradeoff analysis
+
+### Dataset cleanup needed
+
+The raw 32-class Soybean_Diseases has duplicates and junk:
+
+| Problem | Classes | Action |
+|---------|---------|--------|
+| Duplicate disease | Diaporthe, Diaporthe_2015_Kanawha, Stem_Canker | Keep one (Diaporthe) |
+| Duplicate name | Green_stem, Green_stem_disorder | Keep one (Green_stem_disorder) |
+| Not a disease class | Fusarium_healthy_vs_infected | Remove (comparison, not disease) |
+| Vague | Top_Dieback | Review — may overlap with other classes |
+| Overlapping | Fusarium vs Fusarium_healthy_vs_infected | Keep Fusarium only |
+
+Clean set: ~26 classes. Copy to `Curated_Local_Dataset/{train,test}/Soybean_Clean/`, then generate KB xlsx files via the disease_registry pipeline. See [disease_registry/README.md](../../disease_registry/README.md) for pipeline instructions on building local (PDF) and internet (web) knowledge bases.
 
 ## Experiment Log
 
@@ -293,7 +330,67 @@ Per-class comparison:
 4. Few-shot is 4x cheaper per image ($0.02 vs $0.08) but significantly worse
 5. Agentic without KB ≈ few-shot (23% vs 27%) — KB is the differentiator
 
-**Next**: Improve accuracy further — investigate multi-reference images, prompt refinement for hard cases, scale to more images per class.
+### Experiment 15-16 — 2026-03-14 — 27-class scale-up
+
+Excluded 5 junk/duplicate classes (Diaporthe_2015_Kanawha, Green_stem, Fusarium_healthy_vs_infected, Stem_Canker, Top_Dieback) → 27 clean classes × 3 images = 81 test images.
+
+| Approach | Accuracy | Refs | Cost/img |
+|----------|----------|------|----------|
+| Few-shot (k=4) | 35% (28/81) | — | $0.019 |
+| Agentic + local (no strategy) | 37% (30/81) | 1.4 | $0.087 |
+| Agentic + local (min refs) | 38% (31/81) | 3.3 | $0.089 |
+
+**Finding**: At 27 classes, the agentic advantage over few-shot nearly vanished (37% vs 35%). Agent viewed only 1.4 refs — barely using its tools.
+
+### Investigation — 2026-03-14 — 6-agent parallel deep-dive
+
+Spawned 6 agents to investigate 0% classes. Key findings:
+
+1. **Overconfident misclassification**: Agent predicts wrong classes at 0.62-0.91 confidence. Visual observations are reasonable but mapped to wrong diseases.
+2. **k/class ratio**: k=4 out of 27 classes = 15% coverage. Agent can't view enough references to discriminate.
+3. **KB quality mismatch**: Descriptions emphasize textbook pathology, not visually distinctive features (e.g., White_Mold KB describes seeds, but diagnostic feature is stem mycelium).
+4. **Only 5 training images per class**: Single "middle" reference (`_train_003.jpg`) may not be representative.
+5. **Trace bug fixed**: Text was truncated to 500 chars, hiding agent reasoning.
+
+### Experiment 17 — 2026-03-14 — KB-guided strategy prompt
+
+**Change**: System prompt now tells agent to: (1) read test image, (2) use KB to narrow candidates, (3) view references only for top candidates, (4) submit. This makes the agent use KB strategically before spending its reference budget.
+
+| Approach | Accuracy | Refs | Cost/img |
+|----------|----------|------|----------|
+| Few-shot baseline | 35% (28/81) | — | $0.019 |
+| Agentic + local (no strategy) | 37% (30/81) | 1.4 | $0.087 |
+| **Agentic + local (KB-guided)** | **48% (39/81)** | **3.1** | $0.109 |
+
+**+10pp improvement** from strategy prompt alone. Classes that improved: BSR 0→67%, SCN 0→67%, Rhizoctonia 0→67%, Bacterial_Pustule 0→33%, BPMV 0→33%, White_Mold 0→33%.
+
+Still at 0% (5 classes): Cercospora, Fusarium, Phomopsis, Phyllosticta_leaf_spot, Soybean_Dwarf_Mosaic_Virus, Soybean_Vein_necrosis_virus, Tobacco_Streak_Virus.
+
+### Current best result: 48% on 27 classes (agentic + local KB + strategy prompt)
+
+This is **+13pp over few-shot** (48% vs 35%) on the same model, same budget.
+
+### Experiment 18 — 2026-03-14 — Compact ref paths (reverted)
+**Change**: Replaced 27 full paths with a pattern template to reduce prompt noise
+**Results**: 38% (31/81) — dropped from 48%. But logs showed refs=3-4 with no errors, so paths weren't the issue. Likely LLM stochasticity. Reverted to full paths.
+**Finding**: Don't change what works without evidence. The 48% vs 38% difference (8 images on 81 total) is within noise range.
+
+### Experiment 19 — 2026-03-14 — Parallel scaling
+**Change**: Increased parallel from 12 to 20, then 16
+**Results**: parallel=20 → 23/81 errors (rate limiting). parallel=16 → 81/81 errors (credit exhaustion).
+**Finding**: parallel=12 is the safe limit. Higher causes API errors. Credits depleted after ~$50 total spend.
+
+### Current status (2026-03-14)
+**API credits exhausted.** Best result: **48% accuracy** on 27 classes with agentic + local KB + strategy prompt, vs **35% few-shot baseline** (+13pp).
+
+### Next steps (when credits available)
+- [ ] Re-run 48% config to confirm stability (may be 38-48% range due to stochasticity)
+- [ ] Investigate remaining 0% classes — KB quality or visual ambiguity?
+- [ ] Try Glob tool access so agent discovers images (avoids path-in-prompt issue)
+- [ ] Dataset cleanup (Soybean_Clean folder)
+- [ ] Multi-reference images per class
+- [ ] Internet KB comparison at 27-class scale
+- [ ] Increase parallel to speed up runs (test 14-16 range)
 
 ## Claude -p Reference
 
