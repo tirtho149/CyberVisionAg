@@ -663,20 +663,17 @@ The agent doesn't know when to stop. At high k it keeps exploring, finds plausib
 
 ## Evaluation Plan
 
-### Design
+### Paper tables
 
-The main result is a table showing **Method × k** (standard in few-shot / retrieval-augmented papers):
+**Table 1 — Method × k** (main result): How does accuracy scale with reference budget across KB sources?
 
 | Method | k=1 | k=4 | k=8 | k=16 |
 |--------|-----|-----|-----|------|
-| Few-shot baseline (no agent) | | | | |
 | Agent (no KB) | | | | |
 | Agent + local KB | | | | |
 | Agent + internet KB | | | | |
 
-This is 3×4 = 12 agentic runs + 4 few-shot runs = **16 runs per crop**. Each row is a "method" and k varies across columns.
-
-A separate **model ablation** table (at fixed k=8, internet KB):
+**Table 2 — Model ablation** (at k=8, internet KB): Does model quality matter?
 
 | Model | Accuracy | Cost/img |
 |-------|----------|----------|
@@ -684,57 +681,41 @@ A separate **model ablation** table (at fixed k=8, internet KB):
 | Sonnet | | |
 | Opus | | |
 
-**Multiple seeds** (42, 123, 456) for error bars — 3× the runs for final paper, but start with seed=42 to get directional results first.
+### What gets run
+
+14 unique configs (vs 54 if exhaustive grid). No duplicates — sonnet/internet/k=8 is shared between tables.
+
+```
+Main table (12 runs):   sonnet × {none, local, internet} × {k=1, 4, 8, 16}
+Model ablation (2 runs): {haiku, opus} × internet × k=8
+```
 
 ### Fixed settings
 
-- **Refs**: Collage (2×2 grid of 4 training images) — always on
-- **Images/class**: 3 (final results), 2 (quick iteration)
-- **Parallel**: 12
-- **Crop**: Soybean_Diseases, 27 classes (5 junk/duplicate excluded)
-- **Excluded classes**: Diaporthe_2015_Kanawha, Green_stem, Fusarium_healthy_vs_infected, Stem_Canker, Top_Dieback
+- **Collage refs** (2×2 grid of 4 training images per class) — always on
+- **3 images/class** for test, **seed 42**, **parallel 12**
+- **Soybean_Diseases**, 27 classes (excluding Diaporthe_2015_Kanawha, Green_stem, Fusarium_healthy_vs_infected, Stem_Canker, Top_Dieback)
 
-### Results directory structure
-
-```
-results/open_agentic/{crop}/{kb_source}/{model}/k{k}/
-  ├── *.json              # Per-image results (prediction, confidence, reasoning)
-  ├── traces/*.json       # Full agent reasoning traces (tool calls + text)
-  └── summary.json        # Aggregate metrics (accuracy, cost, turns, per-class)
-```
-
-Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
-
-### Run script
-
-`run_sweeps.sh` manages all 14 unique configs. Each config is stored once — no duplicates.
+### How to run
 
 ```bash
 cd /path/to/AgCrawler
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
-# Run all 14 configs
-bash CyberVisionAg/open_agentic/run_sweeps.sh run
-
-# Run only configs that don't have results yet (resume after interruption)
-bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
-
-# Print paper tables from stored results (no runs, just reads)
-bash CyberVisionAg/open_agentic/run_sweeps.sh results
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing  # run what's needed (resumable)
+bash CyberVisionAg/open_agentic/run_sweeps.sh results       # print tables from stored results
+bash CyberVisionAg/open_agentic/run_sweeps.sh status        # check what's done vs missing
+bash CyberVisionAg/open_agentic/run_sweeps.sh clean         # wipe all results for fresh start
 ```
 
-The 14 configs:
-- **Main table**: sonnet × (none, local, internet) × (k=1, 4, 8, 16) = 12
-- **Model ablation**: (haiku, opus) × internet × k=8 = 2 (sonnet/internet/k=8 shared)
+### Where results are stored
 
-`run-missing` is safe to run repeatedly — it skips any config that already has a `summary.json`.
+```
+results/open_agentic/{crop}/{kb_source}/{model}/k{k}/
+├── *.json           # per-image: prediction, confidence, reasoning, correct, cost
+├── summary.json     # aggregate: accuracy, per-class accuracy, avg cost/turns/refs
+└── traces/*.json    # full agent reasoning: every Read call and text block
+```
 
-## Claude -p Reference
-
-See [claude-headless.md](../claude-headless.md) for `claude -p` invocation patterns, output parsing, and environment setup.
-
-Key gotchas from existing codebase (`shared.py`):
-- Must strip `CLAUDE*`, `CURSOR*`, `MCP_CONNECTION*`, `VSCODE*`, `ELECTRON*` env vars — otherwise `claude -p` hangs (nested session detection)
-- Use `Popen` with `start_new_session=True` + `os.killpg()` for reliable timeout/cleanup
-- `--output-format stream-json` gives NDJSON with `assistant` events (tool calls, text) and a final `result` event with `num_turns`, `total_cost_usd`, `duration_ms`
+Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
