@@ -17,7 +17,7 @@
 set -uo pipefail
 
 EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
-IMAGES=3
+IMAGES=1   # test images per class (1=fast directional, 3=final paper)
 PARALLEL=12
 SEED=42
 DATASET="Soybean_Diseases"

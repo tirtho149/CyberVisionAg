@@ -693,7 +693,11 @@ Model ablation (2 runs): {haiku, opus} × internet × k=8
 ### Fixed settings
 
 - **Collage refs** (2×2 grid of 4 training images per class) — always on
-- **3 images/class** for test, **seed 42**, **parallel 12**
+- **`IMAGES`** (in `run_sweeps.sh`) = test images evaluated per class. More images = more stable accuracy, slower runs.
+  - **1 image/class** (27 tests/run) — for directional results, fast iteration
+  - **3 images/class** (81 tests/run) — for final paper numbers
+  - Current setting: **1** (switch to 3 for final runs)
+- **Seed**: 42, **Parallel**: 12
 - **Soybean_Diseases**, 27 classes (excluding Diaporthe_2015_Kanawha, Green_stem, Fusarium_healthy_vs_infected, Stem_Canker, Top_Dieback)
 
 ### How to run
@@ -708,6 +712,13 @@ bash CyberVisionAg/open_agentic/run_sweeps.sh results       # print tables from 
 bash CyberVisionAg/open_agentic/run_sweeps.sh status        # check what's done vs missing
 bash CyberVisionAg/open_agentic/run_sweeps.sh clean         # wipe all results for fresh start
 ```
+
+**Important**: If you change `IMAGES` in `run_sweeps.sh`, run `clean` first — `run-missing` doesn't detect config mismatches and would skip stale results from a prior setting.
+
+### Workflow
+
+1. Set `IMAGES=1` in `run_sweeps.sh` → `run-missing` → `results` → review directional numbers
+2. Once satisfied, `clean` → set `IMAGES=3` → `run-missing` → final paper numbers
 
 ### Where results are stored
 
