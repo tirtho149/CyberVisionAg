@@ -233,11 +233,14 @@ def find_reference_images(
 # ── Environment ────────────────────────────────────────────────────────────────
 
 def _clean_env() -> dict[str, str]:
-    """Strip env vars that cause claude -p to hang (nested session detection)."""
-    return {
+    """Strip env vars that cause claude -p to hang or use wrong credentials."""
+    env = {
         k: v for k, v in os.environ.items()
         if not any(k.startswith(prefix) for prefix in ENV_STRIP_PREFIXES)
     }
+    # Remove API key so claude -p uses the logged-in account, not the API key
+    env.pop("ANTHROPIC_API_KEY", None)
+    return env
 
 
 # ── Single image classification ────────────────────────────────────────────────
