@@ -50,9 +50,11 @@ if [ -z "${COMMAND}" ]; then
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  run           Run all 14 configs (skips none)"
+    echo "  run           Run all 14 configs"
     echo "  run-missing   Run only configs without existing results"
     echo "  results       Print paper tables from stored results"
+    echo "  clean         Remove ALL results (fresh start)"
+    echo "  status        Show which configs have results"
     exit 1
 fi
 
@@ -148,6 +150,40 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
         printf "%-10s | %15s\n" "${model}" "${r}"
     done
     echo ""
+fi
+
+# ── Clean: remove all results ─────────────────────────────────────────────────
+if [ "${COMMAND}" = "clean" ]; then
+    echo "=== Cleaning all results for ${DATASET} ==="
+    echo "This will delete: ${RESULTS_BASE}/"
+    read -p "Are you sure? (y/N) " confirm
+    if [ "${confirm}" = "y" ] || [ "${confirm}" = "Y" ]; then
+        rm -rf "${RESULTS_BASE}"
+        echo "Cleaned."
+    else
+        echo "Cancelled."
+    fi
+fi
+
+# ── Status: show which configs have results ───────────────────────────────────
+if [ "${COMMAND}" = "status" ]; then
+    echo "=== Status: ${DATASET} ==="
+    echo ""
+    done_count=0
+    missing_count=0
+    for config in "${CONFIGS[@]}"; do
+        IFS=',' read -r model src k <<< "${config}"
+        if has_results "${model}" "${src}" "${k}"; then
+            acc=$(read_accuracy "${model}" "${src}" "${k}")
+            echo "  [done]    ${model} | ${src} | k=${k} → ${acc}"
+            done_count=$((done_count + 1))
+        else
+            echo "  [missing] ${model} | ${src} | k=${k}"
+            missing_count=$((missing_count + 1))
+        fi
+    done
+    echo ""
+    echo "Done: ${done_count}/14, Missing: ${missing_count}/14"
 fi
 
 echo "=== Done ==="
