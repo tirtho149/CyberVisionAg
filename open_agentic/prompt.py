@@ -25,7 +25,7 @@ def build_system_prompt() -> str:
 def build_user_message(
     test_image_path: str,
     classes: list[str],
-    ref_images: dict[str, str],
+    ref_images: dict[str, list[str]],
     kb_text: str | None,
     k: int | None,
 ) -> str:
@@ -34,7 +34,7 @@ def build_user_message(
     Args:
         test_image_path: Absolute path to the (neutral-named) test image.
         classes: List of all disease class names.
-        ref_images: {class_name: absolute_path_to_reference_image}.
+        ref_images: {class_name: [list_of_paths]}.
         kb_text: Symptom KB text (markdown), or None.
         k: Max reference images the agent should view, or None for unlimited.
     """
@@ -60,12 +60,21 @@ def build_user_message(
         )
     else:
         budget_note = "View as many as needed to be confident."
-    ref_lines = "\n".join(
-        f"- **{cls}**: `{path}`" for cls, path in sorted(ref_images.items())
-    )
+    ref_lines_parts = []
+    total_refs = 0
+    for cls in sorted(ref_images.keys()):
+        paths = ref_images[cls]
+        total_refs += len(paths)
+        if len(paths) == 1:
+            ref_lines_parts.append(f"- **{cls}**: `{paths[0]}`")
+        else:
+            path_list = ", ".join(f"`{p}`" for p in paths)
+            ref_lines_parts.append(f"- **{cls}**: {path_list}")
+    ref_lines = "\n".join(ref_lines_parts)
+    refs_label = "reference images" if total_refs > len(ref_images) else "reference image per class"
     parts.append(
         f"## Reference Images ({budget_note})\n\n"
-        "One reference image per class. Use the Read tool to view them:\n"
+        f"{total_refs} {refs_label}. Use the Read tool to view them:\n"
         f"{ref_lines}"
     )
 

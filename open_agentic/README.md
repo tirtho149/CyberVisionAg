@@ -456,10 +456,104 @@ Per-class differences (only showing changes):
 
 All three are within the ~42-44% noise band. KB source and metadata richness are not the bottleneck.
 
+### Experiment 22 — 2026-03-15 — KB improvement loop (clean)
+
+**Setup**: Built `improve_kb.py` — a `claude -p` agent that analyzes confusion patterns + reasoning traces and rewrites KB descriptions with differential features. Added `--kb-file` flag to eval.py.
+
+**Bug fixed**: eval.py now clears the log directory before each run, so the improver only sees results from the current eval (previously stacked results from multiple runs).
+
+**Approach**: "Only-failing" mode — improver rewrites descriptions only for classes < 100%, copies 100% classes verbatim to avoid whack-a-mole.
+
+**Loop**: v0 (internet baseline) → improve → v1_clean → eval
+
+| KB Version | Accuracy | Cost/img | Notes |
+|------------|----------|----------|-------|
+| v0 (internet baseline, clean) | **42.6%** (23/54) | $0.098 | 6/27 classes have no KB entry |
+| v1_clean (only-failing improved) | **42.6%** (23/54) | $0.101 | Improver also generated entries for 5 missing diseases |
+
+Per-class: 100% classes all preserved (whack-a-mole fixed). But still 2 regressions and 2 improvements at 50% level, netting zero.
+
+**Key findings from deep investigation**:
+
+1. **Differential KB WORKS where it applies** — reasoning traces confirm the agent uses "Unlike X..." distinctions correctly (e.g., Charcoal_Rot vs Phytophthora: "gray with specks" vs "chocolate-brown" distinction)
+2. **KB coverage gap**: Internet source has NO data for 6/27 classes (Downy_mildew, Rhizoctonia, SCN, SDMV, SVN, Soybean_rust). These classes run in effectively "no KB" mode.
+3. **2 images/class is too noisy for improvement signal** — each flip is ±50pp per class, making it impossible to distinguish real improvement from stochasticity
+4. **Accuracy is stable at ~42-44%** across 4 runs with different KB variants. This appears to be the capability ceiling for the current architecture (1 ref image per class, sonnet model).
+5. **The improver correctly generates new entries** for missing diseases, but with 2 images these can't be validated
+
+### File structure update
+
+```
+CyberVisionAg/open_agentic/
+├── README.md           # This file
+├── __init__.py
+├── eval.py             # Agentic harness with --kb-file support
+├── few_shot.py         # Few-shot baseline
+├── improve_kb.py       # KB improver: analyzes failures, rewrites descriptions
+├── prompt.py           # Prompt construction
+├── run_eval.sh         # Quick eval launcher
+├── kb_v0.md            # Original internet KB (Visual Description only)
+├── kb_v1.md            # First improvement (stale data — superseded)
+└── kb_v1_clean.md      # Clean improvement (only-failing, 54 results)
+```
+
+### Experiment 23 — 2026-03-15 — Multi-reference images (3/class)
+
+**Change**: Added `--refs-per-class` flag. Agent now sees 3 evenly-spaced training images per class (was 1 middle image). Increased k from 4 to 6 to give budget for viewing more refs.
+
+**Config**: internet KB, 27×2, refs-per-class=3, k=6, parallel=12, seed=42
+
+| Refs/class | Accuracy | Avg refs viewed | Cost/img |
+|:-:|:-:|:-:|:-:|
+| 1 (baseline) | 42.6% (23/54) | 3.2 | $0.098 |
+| 3 | 40.7% (22/54) | 5.3 | $0.141 |
+
+**Finding**: More reference images did not help — 40.7% vs 42.6% (within noise). Agent viewed 5.3 refs (vs 3.2), so it did use the extra refs, but accuracy didn't benefit. Cost increased 43%. The bottleneck is not reference image quantity.
+
+### Summary of all experiments at 27×2
+
+| Experiment | Change | Accuracy | Cost/img |
+|---|---|:-:|:-:|
+| 20 | Local KB (baseline) | 42.6% | $0.103 |
+| 21 | Internet KB (desc only) | 44.4% | $0.098 |
+| 21 | Internet KB (all cols) | 42.6% | $0.106 |
+| 22 | Internet KB, clean baseline | 42.6% | $0.098 |
+| 22 | Improved KB v1 (differential) | 42.6% | $0.101 |
+| 23 | Multi-ref (3/class, k=6) | 40.7% | $0.141 |
+
+All within 40-44%. This is the capability ceiling for the current architecture.
+
+### Experiment 24 — 2026-03-15 — Model comparison (Haiku vs Sonnet)
+
+**Change**: Added `--model` CLI flag. Ran Haiku to test if model quality matters.
+
+**Config**: internet KB, 27×2, k=4, parallel=12, seed=42, refs-per-class=1
+
+| Model | Accuracy | Cost/img | Avg duration |
+|-------|:-:|:-:|:-:|
+| Haiku | **25.9%** (14/54) | $0.049 | 29s |
+| Sonnet | **42.6%** (23/54) | $0.098 | 46s |
+
+**Finding**: Haiku drops 17pp — model capability IS a significant factor. The 42% ceiling is not inherent to the task or KB, it's partly a model limitation. Opus is worth testing.
+
+### Experiment 25 — 2026-03-15 — Opus
+
+**Config**: internet KB, 27×2, k=4, parallel=12, seed=42, refs-per-class=1
+
+| Model | Accuracy | Cost/img | Duration | 100% classes |
+|-------|:-:|:-:|:-:|:-:|
+| Haiku | 25.9% (14/54) | $0.049 | 29s | 2 |
+| Sonnet | 42.6% (23/54) | $0.098 | 46s | 6 |
+| **Opus** | **46.3% (25/54)** | $0.166 | 40s | 8 |
+
+Opus 100% classes: Anthracnose, Bacterial_Pustule, Frogeye, Green_stem_disorder, Phomopsis, Phytophthora, Purple_Seed_Stain, Pythium_damping_off, White_Mold (9 actually — plus Brown_Stem_Rot at 50%).
+
+**Finding**: Clear model quality scaling — Haiku 26% → Sonnet 43% → Opus 46%. Diminishing returns from Sonnet→Opus (+3.7pp, 70% more expensive) vs Haiku→Sonnet (+17pp, 2× cost). Opus helps on a few specific classes (Phomopsis 0→100%, Bacterial_Pustule 0→100%) but the hard 0% classes (BPMV, Cercospora, Diaporthe, Fusarium, Septoria, SDMV, SVN, Soybean_rust, SDS, TSV) remain at 0% across all models.
+
 ### Next steps
-- [ ] Investigate persistent 0% classes — what is the actual bottleneck? (KB quality, visual ambiguity, or prompt/reasoning?)
-- [ ] Multi-reference images per class (agent sees only 1 ref per class — maybe too little)
-- [ ] Enrich local KB extraction to include Pathogen and Type (update PDF extraction prompt) — low priority, metadata doesn't help accuracy
+- [ ] Investigate if any of the persistent 0% classes improve with Opus + improved KB (kb_v1_clean)
+- [ ] Cost-benefit analysis: is Opus worth 70% more for +3.7pp?
+- [ ] Enrich local KB to include Pathogen and Type — low priority
 
 ## Claude -p Reference
 

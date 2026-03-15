@@ -36,6 +36,7 @@ RESULTS_DIR = CYBERVISION_DIR / "results" / "open_agentic"
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 MODEL = "sonnet"
+_ACTIVE_MODEL = MODEL  # set by main() from CLI args
 TIMEOUT_S = 300  # 5 minutes per image
 ENV_STRIP_PREFIXES = ("CLAUDE", "CURSOR", "MCP_CONNECTION", "VSCODE", "ELECTRON")
 
@@ -195,8 +196,18 @@ def load_dataset(
     return classes, test_images
 
 
-def find_reference_images(dataset: str, classes: list[str]) -> dict[str, str]:
-    """Find the middle reference image per class (matches current agent.py)."""
+def find_reference_images(
+    dataset: str, classes: list[str], refs_per_class: int = 1,
+) -> dict[str, list[str]]:
+    """Find reference images per class.
+
+    Args:
+        refs_per_class: How many reference images per class (evenly spaced).
+            1 = middle image only (legacy behavior).
+
+    Returns:
+        {class_name: [list_of_paths]}
+    """
     ref_images = {}
     for cls in classes:
         cls_dir = TRAIN_DIR / dataset / cls
@@ -206,8 +217,16 @@ def find_reference_images(dataset: str, classes: list[str]) -> dict[str, str]:
             str(p) for p in cls_dir.iterdir()
             if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
         )
-        if imgs:
-            ref_images[cls] = imgs[len(imgs) // 2]
+        if not imgs:
+            continue
+        if refs_per_class >= len(imgs):
+            ref_images[cls] = imgs
+        elif refs_per_class == 1:
+            ref_images[cls] = [imgs[len(imgs) // 2]]
+        else:
+            # Evenly spaced selection
+            step = len(imgs) / refs_per_class
+            ref_images[cls] = [imgs[int(i * step)] for i in range(refs_per_class)]
     return ref_images
 
 
@@ -282,7 +301,7 @@ def _run_agent(
         "claude", "-p",
         "--output-format", "stream-json",
         "--verbose",
-        "--model", MODEL,
+        "--model", _ACTIVE_MODEL,
         "--allowedTools", "Read",
         "--append-system-prompt", system_prompt,
     ]
@@ -557,6 +576,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Open Agentic Pipeline — plant disease classification"
     )
+    parser.add_argument("--model", default=MODEL,
+                        help=f"Claude model to use (default: {MODEL})")
     parser.add_argument("--symptom-source", default="none",
                         choices=["none", "local", "internet"],
                         help="KB source (default: none)")
@@ -568,6 +589,8 @@ def main():
                         help="Test images per class")
     parser.add_argument("--quick-test", type=int, default=None, metavar="N",
                         help="Shortcut: num-classes=N, images-per-class=1")
+    parser.add_argument("--refs-per-class", type=int, default=1,
+                        help="Reference images per class (default: 1, max: 5)")
     parser.add_argument("--k", type=int, default=None,
                         help="Max reference images to view (default: unlimited)")
     parser.add_argument("--parallel", type=int, default=1,
@@ -580,7 +603,13 @@ def main():
                         help="Comma-separated class names to exclude")
     parser.add_argument("--all-kb-columns", action="store_true",
                         help="Include Pathogen, Type, Affected Parts in KB (not just Visual Description)")
+    parser.add_argument("--kb-file", type=str, default=None,
+                        help="Custom KB markdown file (overrides --symptom-source)")
     args = parser.parse_args()
+
+    # Set active model from CLI
+    global _ACTIVE_MODEL
+    _ACTIVE_MODEL = args.model
 
     # Quick-test shortcut
     if args.quick_test:
@@ -593,18 +622,26 @@ def main():
     classes, test_images = load_dataset(
         args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
     )
-    ref_images = find_reference_images(args.dataset, classes)
+    ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
 
     # Load KB
-    kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
+    if args.kb_file:
+        kb_text = Path(args.kb_file).read_text()
+        kb_label = Path(args.kb_file).stem  # e.g., "kb_v1"
+    else:
+        kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
+        kb_label = args.symptom_source
 
-    # Setup logging
-    log_dir = RESULTS_DIR / args.symptom_source / "logs" / args.dataset
+    # Setup logging — clear previous results so improver only sees current run
+    log_dir = RESULTS_DIR / kb_label / "logs" / args.dataset
+    if log_dir.exists():
+        for old_file in log_dir.glob("*.json"):
+            old_file.unlink()
 
     # Print config
     print("OPEN AGENTIC CLASSIFICATION (claude -p)")
-    print(f"  Model         : {MODEL}")
-    print(f"  Symptom source: {args.symptom_source}")
+    print(f"  Model         : {_ACTIVE_MODEL}")
+    print(f"  Symptom source: {args.kb_file or args.symptom_source}")
     print(f"  Dataset       : {args.dataset}")
     print(f"  Classes       : {len(classes)}")
     print(f"  Test images   : {len(test_images)}")
