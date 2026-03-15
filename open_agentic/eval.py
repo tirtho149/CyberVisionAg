@@ -276,10 +276,15 @@ def run_single_image(
         log_dir.mkdir(parents=True, exist_ok=True)
         img_name = Path(test_image).stem
         log_file = log_dir / f"{img_name}.json"
-        # Write trace separately to keep logs manageable
         trace = result.pop("trace", [])
         with open(log_file, "w") as f:
             json.dump(result, f, indent=2)
+        # Save trace separately (for reasoning analysis)
+        if trace:
+            trace_dir = log_dir / "traces"
+            trace_dir.mkdir(exist_ok=True)
+            with open(trace_dir / f"{img_name}.json", "w") as f:
+                json.dump(trace, f, indent=2)
         result["trace"] = trace  # restore for in-memory use
 
     return result
@@ -635,11 +640,18 @@ def main():
         kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
         kb_label = args.symptom_source
 
-    # Setup logging — clear previous results so improver only sees current run
-    log_dir = RESULTS_DIR / kb_label / "logs" / args.dataset
+    # Setup logging — dir includes model and k so different configs don't clobber
+    k_label = f"k{args.k}" if args.k else "kunlimited"
+    log_dir = RESULTS_DIR / kb_label / _ACTIVE_MODEL / k_label / args.dataset
+    # Clear only this specific config's prior results
     if log_dir.exists():
         for old_file in log_dir.glob("*.json"):
             old_file.unlink()
+        # Also clear traces
+        trace_dir = log_dir / "traces"
+        if trace_dir.exists():
+            for old_file in trace_dir.glob("*.json"):
+                old_file.unlink()
 
     # Print config
     print("OPEN AGENTIC CLASSIFICATION (claude -p)")

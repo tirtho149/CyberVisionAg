@@ -570,10 +570,26 @@ Future sweeps (same script, change SOURCE variable):
 - [ ] Local KB sweep
 - [ ] No KB sweep
 
-### Next steps
-- [ ] Run `run_model_k_sweep.sh` when credits available
-- [ ] Repeat sweep with local KB and none KB
-- [ ] KB improvement loop — parked for now, revisit after sweep results
+### Key insight (2026-03-15)
+
+**What works**: Model quality matters (Haiku 26% → Sonnet 43% → Opus 46%). KB symptom descriptions matter (none ~23% → with KB ~43%). Agentic + KB > few-shot baseline.
+
+**What doesn't work YET**: Increasing k (reference image budget) does NOT improve accuracy. Agent views ~3 refs regardless of budget and adding more doesn't help. **This is the top priority to fix** — for the paper's storyline, accuracy should scale with k.
+
+### Investigating: why doesn't k help? (in progress)
+
+The agent can view reference images but doesn't benefit from more. Possible causes:
+1. Agent decides early and only confirms — more refs just reinforce first impression
+2. Single ref per class shows one presentation — more classes viewed ≠ more info per class
+3. Agent doesn't systematically compare test image against refs
+
+**Experiment plan**: Sonnet + internet KB, vary k=1,2,4,8, analyze reasoning traces to understand HOW the agent uses (or ignores) reference images.
+
+### Future ideas (parked — revisit after k investigation)
+- [ ] **Image-derived KB**: Instead of web text, generate visual descriptions by having an agent look at training images and describe how each disease class looks. More grounded than textbook descriptions.
+- [ ] **Collage refs**: Instead of showing 1 image at a time, create a 2×2 collage of 4 training images per class. Agent sees diversity in one view, costs 1 ref budget instead of 4.
+- [ ] KB improvement loop — parked, revisit after k investigation
+- [ ] Full model × k sweep for local/none KB sources
 
 ## Claude -p Reference
 
