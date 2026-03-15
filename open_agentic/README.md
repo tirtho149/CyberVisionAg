@@ -702,23 +702,33 @@ Model ablation (2 runs): {haiku, opus} × internet × k=8
 
 ### How to run
 
+Full copy-paste commands:
+
 ```bash
-cd /path/to/AgCrawler
+# Setup (run once per terminal session)
+cd /Users/muhammadarbabarshad/build2026-local/AgCrawler
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
-bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing  # run what's needed (resumable)
-bash CyberVisionAg/open_agentic/run_sweeps.sh results       # print tables from stored results
-bash CyberVisionAg/open_agentic/run_sweeps.sh status        # check what's done vs missing
-bash CyberVisionAg/open_agentic/run_sweeps.sh clean         # wipe all results for fresh start
+# Clean old results (required when IMAGES setting changes)
+echo y | bash CyberVisionAg/open_agentic/run_sweeps.sh clean
+
+# Run all 14 configs (or only missing ones)
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
+
+# Check progress
+bash CyberVisionAg/open_agentic/run_sweeps.sh status
+
+# Print paper tables from stored results
+bash CyberVisionAg/open_agentic/run_sweeps.sh results
 ```
 
 **Important**: If you change `IMAGES` in `run_sweeps.sh`, run `clean` first — `run-missing` doesn't detect config mismatches and would skip stale results from a prior setting.
 
 ### Workflow
 
-1. Set `IMAGES=1` in `run_sweeps.sh` → `run-missing` → `results` → review directional numbers
-2. Once satisfied, `clean` → set `IMAGES=3` → `run-missing` → final paper numbers
+1. Set `IMAGES=1` in `run_sweeps.sh` → `clean` → `run-missing` → `results` → review directional numbers
+2. Once satisfied, set `IMAGES=3` → `clean` → `run-missing` → final paper numbers
 
 ### Where results are stored
 
