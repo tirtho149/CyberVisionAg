@@ -690,9 +690,9 @@ def main():
         kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
         kb_label = args.symptom_source
 
-    # Setup logging — dir includes model and k so different configs don't clobber
+    # Setup logging — dir includes crop/kb/model/k so configs don't clobber
     k_label = f"k{args.k}" if args.k else "kunlimited"
-    log_dir = RESULTS_DIR / kb_label / _ACTIVE_MODEL / k_label / args.dataset
+    log_dir = RESULTS_DIR / args.dataset / kb_label / _ACTIVE_MODEL / k_label
     # Clear only this specific config's prior results
     if log_dir.exists():
         for old_file in log_dir.glob("*.json"):

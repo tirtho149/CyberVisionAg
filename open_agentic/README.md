@@ -663,81 +663,66 @@ The agent doesn't know when to stop. At high k it keeps exploring, finds plausib
 
 ## Evaluation Plan
 
-### Fixed defaults
+### Design
 
-All experiments use these unless explicitly varied:
+The main result is a table showing **Method × k** (standard in few-shot / retrieval-augmented papers):
+
+| Method | k=1 | k=4 | k=8 | k=16 |
+|--------|-----|-----|-----|------|
+| Few-shot baseline (no agent) | | | | |
+| Agent (no KB) | | | | |
+| Agent + local KB | | | | |
+| Agent + internet KB | | | | |
+
+This is 3×4 = 12 agentic runs + 4 few-shot runs = **16 runs per crop**. Each row is a "method" and k varies across columns.
+
+A separate **model ablation** table (at fixed k=8, internet KB):
+
+| Model | Accuracy | Cost/img |
+|-------|----------|----------|
+| Haiku | | |
+| Sonnet | | |
+| Opus | | |
+
+**Multiple seeds** (42, 123, 456) for error bars — 3× the runs for final paper, but start with seed=42 to get directional results first.
+
+### Fixed settings
+
 - **Refs**: Collage (2×2 grid of 4 training images) — always on
-- **Images/class**: 3 (for final results; 2 for quick iteration)
-- **Seed**: 42
+- **Images/class**: 3 (final results), 2 (quick iteration)
 - **Parallel**: 12
-- **Dataset**: Soybean_Diseases, 27 classes (5 junk excluded)
-
-### Sweeps (one factor at a time)
-
-Each sweep varies **one factor** while holding others at default. This avoids combinatorial explosion (14 runs vs 108+ brute force).
-
-| Sweep | Varies | Fixed at | Runs | Status |
-|-------|--------|----------|:----:|--------|
-| **1. k sweep** | k=1,2,4,8,16,27 | sonnet, internet | 6 | done (Exp 28) |
-| **2. KB sweep** | none, local, internet | sonnet, k=8 | 3 | pending |
-| **3. Model sweep** | haiku, sonnet, opus | internet, k=8 | 3 | pending |
-| **4. Crop sweep** | soybean (+ future) | sonnet, internet, k=8 | N | future |
-
-**Total for soybean: 12 runs.** Sweep 1 already done (6 runs). Sweeps 2-3 need 6 more runs.
+- **Crop**: Soybean_Diseases, 27 classes (5 junk/duplicate excluded)
+- **Excluded classes**: Diaporthe_2015_Kanawha, Green_stem, Fusarium_healthy_vs_infected, Stem_Canker, Top_Dieback
 
 ### Results directory structure
 
 ```
-results/open_agentic/{kb_source}/{model}/k{k}/{dataset}/
-  ├── *.json              # Per-image results
-  ├── traces/*.json       # Agent reasoning traces
-  └── summary.json        # Aggregate metrics
+results/open_agentic/{crop}/{kb_source}/{model}/k{k}/
+  ├── *.json              # Per-image results (prediction, confidence, reasoning)
+  ├── traces/*.json       # Full agent reasoning traces (tool calls + text)
+  └── summary.json        # Aggregate metrics (accuracy, cost, turns, per-class)
 ```
 
-Example: `results/open_agentic/internet/sonnet/k8/Soybean_Diseases/`
+Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
 
-### Run commands
+### Run script
+
+`run_sweeps.sh` runs named experiment groups:
 
 ```bash
 cd /path/to/AgCrawler
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
-EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
 
-# Sweep 1: k sweep (sonnet, internet) — DONE
-for k in 1 2 4 8 16 27; do
-  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
-    --model sonnet --symptom-source internet \
-    --images-per-class 3 --k $k --parallel 12 --seed 42 \
-    --exclude "$EXCLUDE"
-done
+# Main results table (Method × k)
+bash CyberVisionAg/open_agentic/run_sweeps.sh main-table
 
-# Sweep 2: KB sweep (sonnet, k=8)
-for src in none local internet; do
-  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
-    --model sonnet --symptom-source $src \
-    --images-per-class 3 --k 8 --parallel 12 --seed 42 \
-    --exclude "$EXCLUDE"
-done
+# Model ablation (haiku/sonnet/opus at k=8)
+bash CyberVisionAg/open_agentic/run_sweeps.sh model-ablation
 
-# Sweep 3: Model sweep (internet, k=8)
-for model in haiku sonnet opus; do
-  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
-    --model $model --symptom-source internet \
-    --images-per-class 3 --k 8 --parallel 12 --seed 42 \
-    --exclude "$EXCLUDE"
-done
+# All experiments
+bash CyberVisionAg/open_agentic/run_sweeps.sh all
 ```
-
-### Paper figures (planned)
-
-| Figure | Data source | X-axis | Lines/bars |
-|--------|-------------|--------|------------|
-| Accuracy vs k | Sweep 1 | k | single line |
-| Accuracy by KB source | Sweep 2 | KB source | bars |
-| Accuracy by model | Sweep 3 | model | bars |
-| Combined: model × KB | Sweeps 2+3 | KB source | one line per model |
-| Generalization | Sweep 4 | crop | bars |
 
 ## Claude -p Reference
 
