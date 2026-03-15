@@ -230,6 +230,52 @@ def find_reference_images(
     return ref_images
 
 
+def make_collages(
+    dataset: str, classes: list[str], n: int = 4,
+) -> dict[str, list[str]]:
+    """Create a 2×2 collage of training images per class.
+
+    Returns {class_name: [collage_path]} — one collage per class,
+    so it uses 1 ref budget but shows n images.
+    """
+    from PIL import Image
+
+    collage_dir = Path(tempfile.mkdtemp(prefix="collages_"))
+    ref_images = {}
+    for cls in classes:
+        cls_dir = TRAIN_DIR / dataset / cls
+        if not cls_dir.exists():
+            continue
+        imgs = sorted(
+            str(p) for p in cls_dir.iterdir()
+            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+        )
+        if not imgs:
+            continue
+        # Pick n evenly spaced images
+        selected = imgs if len(imgs) <= n else [
+            imgs[int(i * len(imgs) / n)] for i in range(n)
+        ]
+        # Create 2×2 collage
+        pil_imgs = [Image.open(p) for p in selected]
+        # Resize all to same size (use smallest dimensions)
+        w = min(im.width for im in pil_imgs)
+        h = min(im.height for im in pil_imgs)
+        size = (min(w, 400), min(h, 400))  # cap at 400px per tile
+        pil_imgs = [im.resize(size) for im in pil_imgs]
+        cols = 2
+        rows = (len(pil_imgs) + 1) // 2
+        collage = Image.new("RGB", (size[0] * cols, size[1] * rows))
+        for i, im in enumerate(pil_imgs):
+            x = (i % cols) * size[0]
+            y = (i // cols) * size[1]
+            collage.paste(im, (x, y))
+        collage_path = str(collage_dir / f"{cls}.jpg")
+        collage.save(collage_path, quality=85)
+        ref_images[cls] = [collage_path]
+    return ref_images
+
+
 # ── Environment ────────────────────────────────────────────────────────────────
 
 def _clean_env() -> dict[str, str]:
@@ -462,11 +508,10 @@ def _count_ref_reads(trace: list[dict], test_image: str) -> int:
         file_path = entry.get("input", {}).get("file_path", "")
         if file_path == test_image:
             continue
-        # Reference images are in the train directory
-        if "train" in file_path and file_path.lower().endswith(
-            (".jpg", ".jpeg", ".png", ".webp")
-        ):
-            count += 1
+        # Reference images: in train dir OR collage temp dir
+        if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            if "train" in file_path or "collage" in file_path:
+                count += 1
     return count
 
 
@@ -597,6 +642,8 @@ def main():
                         help="Test images per class")
     parser.add_argument("--quick-test", type=int, default=None, metavar="N",
                         help="Shortcut: num-classes=N, images-per-class=1")
+    parser.add_argument("--collage", action="store_true",
+                        help="Use 2x2 collage of 4 training images as reference (1 view = 4 images)")
     parser.add_argument("--refs-per-class", type=int, default=1,
                         help="Reference images per class (default: 1, max: 5)")
     parser.add_argument("--k", type=int, default=None,
@@ -630,7 +677,10 @@ def main():
     classes, test_images = load_dataset(
         args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
     )
-    ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
+    if args.collage:
+        ref_images = make_collages(args.dataset, classes)
+    else:
+        ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
 
     # Load KB
     if args.kb_file:

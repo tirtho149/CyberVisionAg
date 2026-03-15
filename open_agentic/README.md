@@ -576,19 +576,63 @@ Future sweeps (same script, change SOURCE variable):
 
 **What doesn't work YET**: Increasing k (reference image budget) does NOT improve accuracy. Agent views ~3 refs regardless of budget and adding more doesn't help. **This is the top priority to fix** — for the paper's storyline, accuracy should scale with k.
 
-### Investigating: why doesn't k help? (in progress)
+### Experiment 26 — 2026-03-15 — K sweep (10 classes × 1 image, fast feedback)
 
-The agent can view reference images but doesn't benefit from more. Possible causes:
-1. Agent decides early and only confirms — more refs just reinforce first impression
-2. Single ref per class shows one presentation — more classes viewed ≠ more info per class
-3. Agent doesn't systematically compare test image against refs
+**Config**: Sonnet, internet KB, 10 classes × 1 image, seed=42, parallel=10. ~1 min per run.
 
-**Experiment plan**: Sonnet + internet KB, vary k=1,2,4,8, analyze reasoning traces to understand HOW the agent uses (or ignores) reference images.
+| k | Accuracy | Refs viewed | Turns |
+|:-:|:-:|:-:|:-:|
+| 1 | 70% (7/10) | 1.0 | 3.0 |
+| 2 | 50% (5/10) | 1.3 | 3.3 |
+| 4 | 70% (7/10) | 3.4 | 5.4 |
+| **8** | **90% (9/10)** | 7.7 | 9.9 |
+| 10 | 50% (5/10) | 8.8 | 10.6 |
 
-### Future ideas (parked — revisit after k investigation)
-- [ ] **Image-derived KB**: Instead of web text, generate visual descriptions by having an agent look at training images and describe how each disease class looks. More grounded than textbook descriptions.
-- [ ] **Collage refs**: Instead of showing 1 image at a time, create a 2×2 collage of 4 training images per class. Agent sees diversity in one view, costs 1 ref budget instead of 4.
-- [ ] KB improvement loop — parked, revisit after k investigation
+**k=8 hit 90%!** But k=10 dropped to 50%. Per-image analysis:
+
+| Image | k=1 | k=2 | k=4 | k=8 | k=10 |
+|-------|:-:|:-:|:-:|:-:|:-:|
+| Anthracnose | OK | OK | OK | OK | OK |
+| BSR | OK | OK | OK | OK | OK |
+| Diaporthe | OK | OK | OK | OK | OK |
+| Pythium | OK | OK | OK | OK | OK |
+| BPMV | OK | X | X | OK | X |
+| Downy_mildew | OK | OK | OK | OK | X |
+| SDMV | X | X | OK | OK | X |
+| Soybean_rust | X | X | X | OK | OK |
+| TSV | X | X | OK | OK | X |
+| SCN | OK | X | X | X | ERR |
+
+**Findings**:
+1. **k DOES help for some images**: Soybean_rust and TSV go from wrong at k=1-2 to correct at k=4+. SDMV corrects at k=4+.
+2. **k=8 is the sweet spot for 10 classes**: Agent views 7.7/8 budget, explores most candidates.
+3. **k=10 degrades**: Trace shows agent **wastes budget re-reading the same class** (BPMV read 3 times) instead of exploring new candidates. Gets overwhelmed.
+4. **4 "easy" classes always correct** regardless of k — these don't need refs.
+5. **SCN regresses with more k** — agent gets confused by more options.
+
+**Root cause of k=10 failure**: Agent re-reads classes it already checked instead of exploring new ones. No deduplication in its strategy.
+
+### Experiment 27 — 2026-03-15 — Collage references (2×2 grid of 4 training images)
+
+**Change**: Added `--collage` flag. Instead of 1 training image per class, creates a 2×2 collage of 4 evenly-spaced training images. Each ref view now shows 4× more visual info. Fixed ref counter to also count collage reads.
+
+**Config**: Sonnet, internet KB, 10 classes × 1 image, seed=42
+
+| k | Single ref | Collage (4 imgs) | Delta |
+|:-:|:-:|:-:|:-:|
+| 1 | 70% | 70% | — |
+| 2 | 50% | **80%** | +30pp |
+| 4 | 70% | **90%** | +20pp |
+| 8 | 90% | 90% | — |
+| 10 | 50% | **70%** | +20pp |
+
+**Finding**: Collage is consistently better or equal. Key improvements at k=2 (+30pp) and k=4 (+20pp). The k=10 collapse (50% → 70%) is reduced but not eliminated. Each collage view gives the agent 4× more visual info per budget unit, so it needs fewer views to build a good mental model of each disease class.
+
+### Next steps
+- [ ] Scale collage test to 27 classes × 2 images to validate at full scale
+- [ ] Run collage k sweep with Opus to see if model + collage stack
+- [ ] **Image-derived KB**: Generate visual descriptions by looking at training images instead of web text
+- [ ] KB improvement loop — parked
 - [ ] Full model × k sweep for local/none KB sources
 
 ## Claude -p Reference
