@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Run evaluation experiments for the paper.
+# Run all unique evaluation configs and print results.
+#
+# Runs 14 unique (model, kb, k) combinations. Results are stored in
+# results/open_agentic/{crop}/{kb}/{model}/k{k}/ and can be read by
+# the results command without re-running.
 #
 # Usage:
 #   cd /path/to/AgCrawler
 #   source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 #   set -a && source .env && set +a
-#   bash CyberVisionAg/open_agentic/run_sweeps.sh <experiment>
 #
-# Experiments:
-#   main-table       Method (none/local/internet KB) × k (1,4,8,16) — 12 runs
-#   model-ablation   Model (haiku/sonnet/opus) at k=8, internet KB — 3 runs
-#   all              All of the above — 15 runs
-#
-# All experiments use: collage refs, seed=42, parallel=12, 27 soybean classes
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh run          # run all 14 configs
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh results      # print tables from stored results
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing   # only run configs without results
 
 set -uo pipefail
 
@@ -20,19 +20,43 @@ EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Can
 IMAGES=3
 PARALLEL=12
 SEED=42
-EXPERIMENT="${1:-}"
+DATASET="Soybean_Diseases"
+COMMAND="${1:-}"
 
-if [ -z "${EXPERIMENT}" ]; then
-    echo "Usage: $0 <experiment>"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
+
+# All 14 unique configs: model,kb,k
+CONFIGS=(
+    # Main table: sonnet × 3 KB × 4 k values = 12
+    "sonnet,none,1"
+    "sonnet,none,4"
+    "sonnet,none,8"
+    "sonnet,none,16"
+    "sonnet,local,1"
+    "sonnet,local,4"
+    "sonnet,local,8"
+    "sonnet,local,16"
+    "sonnet,internet,1"
+    "sonnet,internet,4"
+    "sonnet,internet,8"    # shared with model ablation
+    "sonnet,internet,16"
+    # Model ablation: haiku + opus at internet/k=8 = 2 (sonnet already above)
+    "haiku,internet,8"
+    "opus,internet,8"
+)
+
+if [ -z "${COMMAND}" ]; then
+    echo "Usage: $0 <command>"
     echo ""
-    echo "Experiments:"
-    echo "  main-table       Method × k table (12 runs)"
-    echo "  model-ablation   Model comparison at k=8 (3 runs)"
-    echo "  all              Everything (15 runs)"
+    echo "Commands:"
+    echo "  run           Run all 14 configs (skips none)"
+    echo "  run-missing   Run only configs without existing results"
+    echo "  results       Print paper tables from stored results"
     exit 1
 fi
 
-run_eval() {
+run_single() {
     local model="$1" src="$2" k="$3"
     echo -n "  ${model} | ${src} | k=${k}: "
     OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
@@ -48,46 +72,82 @@ run_eval() {
     echo "${acc}  refs=${refs}  cost=${cost}  errors=${errors}"
 }
 
-# ── Main results table: Method × k ───────────────────────────────────────────
-run_main_table() {
-    echo "=== Main Table: Method × k (sonnet, 27 classes × ${IMAGES} images) ==="
+has_results() {
+    local model="$1" src="$2" k="$3"
+    local dir="${RESULTS_BASE}/${src}/${model}/k${k}"
+    [ -f "${dir}/summary.json" ]
+}
+
+read_accuracy() {
+    local model="$1" src="$2" k="$3"
+    local summary="${RESULTS_BASE}/${src}/${model}/k${k}/summary.json"
+    if [ -f "${summary}" ]; then
+        python3 -c "
+import json
+d = json.load(open('${summary}'))
+m = d.get('metrics', d)
+acc = m.get('accuracy', 0)
+n = m.get('correct', 0)
+t = m.get('total', 0)
+print(f'{n}/{t} ({acc:.1f}%)')
+" 2>/dev/null || echo "?"
+    else
+        echo "—"
+    fi
+}
+
+# ── Run commands ──────────────────────────────────────────────────────────────
+if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
+    echo "=== Running evaluation configs ==="
+    echo "Dataset: ${DATASET}, images/class: ${IMAGES}, seed: ${SEED}"
     echo ""
+
+    ran=0
+    skipped=0
+    for config in "${CONFIGS[@]}"; do
+        IFS=',' read -r model src k <<< "${config}"
+        if [ "${COMMAND}" = "run-missing" ] && has_results "${model}" "${src}" "${k}"; then
+            echo "  ${model} | ${src} | k=${k}: EXISTS (skipping)"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        run_single "${model}" "${src}" "${k}"
+        ran=$((ran + 1))
+    done
+
+    echo ""
+    echo "Ran: ${ran}, Skipped: ${skipped}"
+    echo ""
+fi
+
+# ── Print results tables ─────────────────────────────────────────────────────
+if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
+    echo "=== Table 1: Method × k (sonnet) ==="
+    echo ""
+    printf "%-20s | %15s | %15s | %15s | %15s\n" "Method" "k=1" "k=4" "k=8" "k=16"
+    printf "%-20s-|-%15s-|-%15s-|-%15s-|-%15s\n" "--------------------" "---------------" "---------------" "---------------" "---------------"
     for src in none local internet; do
-        echo "--- KB: ${src} ---"
-        for k in 1 4 8 16; do
-            run_eval sonnet "${src}" "${k}"
-        done
-        echo ""
+        label="Agent"
+        [ "${src}" = "none" ] && label="Agent (no KB)"
+        [ "${src}" = "local" ] && label="Agent + local KB"
+        [ "${src}" = "internet" ] && label="Agent + internet KB"
+        r1=$(read_accuracy sonnet "${src}" 1)
+        r4=$(read_accuracy sonnet "${src}" 4)
+        r8=$(read_accuracy sonnet "${src}" 8)
+        r16=$(read_accuracy sonnet "${src}" 16)
+        printf "%-20s | %15s | %15s | %15s | %15s\n" "${label}" "${r1}" "${r4}" "${r8}" "${r16}"
     done
-}
-
-# ── Model ablation: haiku/sonnet/opus at k=8 ─────────────────────────────────
-run_model_ablation() {
-    echo "=== Model Ablation: k=8, internet KB, 27 classes × ${IMAGES} images ==="
     echo ""
+
+    echo "=== Table 2: Model Ablation (internet KB, k=8) ==="
+    echo ""
+    printf "%-10s | %15s\n" "Model" "Accuracy"
+    printf "%-10s-|-%15s\n" "----------" "---------------"
     for model in haiku sonnet opus; do
-        run_eval "${model}" internet 8
+        r=$(read_accuracy "${model}" internet 8)
+        printf "%-10s | %15s\n" "${model}" "${r}"
     done
     echo ""
-}
-
-# ── Dispatch ──────────────────────────────────────────────────────────────────
-case "${EXPERIMENT}" in
-    main-table)
-        run_main_table
-        ;;
-    model-ablation)
-        run_model_ablation
-        ;;
-    all)
-        run_main_table
-        run_model_ablation
-        ;;
-    *)
-        echo "Unknown experiment: ${EXPERIMENT}"
-        echo "Options: main-table, model-ablation, all"
-        exit 1
-        ;;
-esac
+fi
 
 echo "=== Done ==="

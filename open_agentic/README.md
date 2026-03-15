@@ -707,22 +707,28 @@ Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
 
 ### Run script
 
-`run_sweeps.sh` runs named experiment groups:
+`run_sweeps.sh` manages all 14 unique configs. Each config is stored once — no duplicates.
 
 ```bash
 cd /path/to/AgCrawler
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
-# Main results table (Method × k)
-bash CyberVisionAg/open_agentic/run_sweeps.sh main-table
+# Run all 14 configs
+bash CyberVisionAg/open_agentic/run_sweeps.sh run
 
-# Model ablation (haiku/sonnet/opus at k=8)
-bash CyberVisionAg/open_agentic/run_sweeps.sh model-ablation
+# Run only configs that don't have results yet (resume after interruption)
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
 
-# All experiments
-bash CyberVisionAg/open_agentic/run_sweeps.sh all
+# Print paper tables from stored results (no runs, just reads)
+bash CyberVisionAg/open_agentic/run_sweeps.sh results
 ```
+
+The 14 configs:
+- **Main table**: sonnet × (none, local, internet) × (k=1, 4, 8, 16) = 12
+- **Model ablation**: (haiku, opus) × internet × k=8 = 2 (sonnet/internet/k=8 shared)
+
+`run-missing` is safe to run repeatedly — it skips any config that already has a `summary.json`.
 
 ## Claude -p Reference
 
