@@ -550,10 +550,30 @@ Opus 100% classes: Anthracnose, Bacterial_Pustule, Frogeye, Green_stem_disorder,
 
 **Finding**: Clear model quality scaling — Haiku 26% → Sonnet 43% → Opus 46%. Diminishing returns from Sonnet→Opus (+3.7pp, 70% more expensive) vs Haiku→Sonnet (+17pp, 2× cost). Opus helps on a few specific classes (Phomopsis 0→100%, Bacterial_Pustule 0→100%) but the hard 0% classes (BPMV, Cercospora, Diaporthe, Fusarium, Septoria, SDMV, SVN, Soybean_rust, SDS, TSV) remain at 0% across all models.
 
+### Planned: Model × K sweep
+
+**Goal**: Full comparison matrix — Model (haiku, sonnet, opus) × K (1, 2, 4, 8), internet KB fixed.
+
+Script: `run_model_k_sweep.sh` — runs 12 experiments, writes `sweep_results.csv`.
+
+```bash
+cd /path/to/AgCrawler
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+bash CyberVisionAg/open_agentic/run_model_k_sweep.sh
+```
+
+**Status**: Credits exhausted (2026-03-15). Script ready — run when credits available.
+
+Future sweeps (same script, change SOURCE variable):
+- [ ] Internet KB sweep (current)
+- [ ] Local KB sweep
+- [ ] No KB sweep
+
 ### Next steps
-- [ ] Investigate if any of the persistent 0% classes improve with Opus + improved KB (kb_v1_clean)
-- [ ] Cost-benefit analysis: is Opus worth 70% more for +3.7pp?
-- [ ] Enrich local KB to include Pathogen and Type — low priority
+- [ ] Run `run_model_k_sweep.sh` when credits available
+- [ ] Repeat sweep with local KB and none KB
+- [ ] KB improvement loop — parked for now, revisit after sweep results
 
 ## Claude -p Reference
 
