@@ -381,16 +381,85 @@ This is **+13pp over few-shot** (48% vs 35%) on the same model, same budget.
 **Finding**: parallel=12 is the safe limit. Higher causes API errors. Credits depleted after ~$50 total spend.
 
 ### Current status (2026-03-14)
-**API credits exhausted.** Best result: **48% accuracy** on 27 classes with agentic + local KB + strategy prompt, vs **35% few-shot baseline** (+13pp).
+Best result: **48% accuracy** on 27 classes with agentic + local KB + strategy prompt, vs **35% few-shot baseline** (+13pp). Typical range is 37-48% due to LLM stochasticity.
 
-### Next steps (when credits available)
-- [ ] Re-run 48% config to confirm stability (may be 38-48% range due to stochasticity)
-- [ ] Investigate remaining 0% classes — KB quality or visual ambiguity?
-- [ ] Try Glob tool access so agent discovers images (avoids path-in-prompt issue)
-- [ ] Dataset cleanup (Soybean_Clean folder)
-- [ ] Multi-reference images per class
-- [ ] Internet KB comparison at 27-class scale
-- [ ] Increase parallel to speed up runs (test 14-16 range)
+### Fast iteration principle
+
+**The feedback loop must be fast.** Every experiment should complete in ~2 minutes so we can iterate quickly. The standard fast config is:
+
+- **27 classes × 2 images/class = 54 test images** (instead of 3 images × 27 = 81)
+- Covers ALL classes (catches regressions everywhere) while being ~1.5x faster and cheaper
+- At parallel=12, runs in ~2 minutes and costs ~$5
+- Each flip is ~1.9pp noise — stable enough to detect real signal
+- Use 3 images/class only for final validation of a promising change
+
+```bash
+# Fast feedback run (27 classes × 2 images = 54 tests, ~2 min)
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source local --images-per-class 2 --k 4 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
+
+# Full validation run (only after fast run shows improvement)
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source local --images-per-class 3 --k 4 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
+```
+
+### Experiment 20 — 2026-03-14 — Fast baseline (27×2)
+
+**Change**: Established fast feedback config — 27 classes × 2 images = 54 tests
+**Config**: local KB + strategy prompt, k=4, parallel=12, seed=42, exclude 5 junk classes
+**Results**: **42.6%** (23/54), 0 errors, avg 5.1 turns, 3.1 refs, $0.10/img, $5.57 total, ~4.5 min wall time
+
+Per-class:
+
+| 100% (7 classes) | 50% (7 classes) | 0% (13 classes) |
+|---|---|---|
+| Brown_Stem_Rot, Diaporthe, Frogeye_leaf_spot, Green_stem_disorder, Powdery_Mildew, Purple_Seed_Stain, Pythium_damping_off | Bacterial_Blight, Phyllosticta_leaf_spot, Phytophthora, Rhizoctonia, SCN, SDS, White_Mold | Anthracnose, Bacterial_Pustule, BPMV, Cercospora, Charcoal_Rot, Downy_mildew, Fusarium, Phomopsis, Septoria, SDMV, SVN, Soybean_rust, TSV |
+
+**Finding**: 42.6% confirms the 37-48% range from prior experiments. 0 errors (credits working). Fast config takes ~4.5 min — acceptable for iteration. 13 classes at 0% with only 2 images means some are just unlucky (e.g., Anthracnose was 33-100% in prior runs), but the persistent 0% classes (Fusarium, SDMV, SVN, TSV) are real failures.
+
+**KB coverage observation**: Currently only Visual Description (col E) is sent to the agent. The xlsx also has Pathogen, Type of Disease, Affected Parts columns — internet KB fills all of these, local KB only fills Affected Parts. Sending more columns (especially Affected Parts and disease Type) could help the agent narrow candidates faster.
+
+### Experiment 21 — 2026-03-14 — Internet KB: all columns vs Visual Description only (A/B)
+
+**Change**: Modified `_load_xlsx_as_markdown()` to optionally include Pathogen, Type, Affected Parts (via `--all-kb-columns` flag). Ran internet KB both ways for a clean comparison.
+
+**Config**: internet KB, 27×2, k=4, parallel=12, seed=42
+
+| Variant | Accuracy | Cost/img |
+|---------|----------|----------|
+| Visual Description only (control) | **44.4%** (24/54) | $0.098 |
+| All columns (Pathogen+Type+Parts+Desc) | **42.6%** (23/54) | $0.106 |
+
+Per-class differences (only showing changes):
+
+| Class | Desc only | All cols | Delta |
+|-------|:-:|:-:|---|
+| Bacterial_Blight | 100% | 50% | -50 |
+| Bacterial_Pustule | 0% | 50% | +50 |
+| Cercospora | 0% | 50% | +50 |
+| Charcoal_Rot | 0% | 50% | +50 |
+| Diaporthe | 0% | 0% | — |
+| Fusarium | 50% | 0% | -50 |
+| SCN | 50% | 0% | -50 |
+
+**Finding**: Adding Pathogen/Type/Affected Parts metadata **did not help** — 1 image difference (within noise). The extra context slightly increases cost (+8%) without accuracy gain. Visual Description alone carries the useful signal. Dropping this line of investigation.
+
+**Cross-source comparison** (all at 27×2, seed=42):
+
+| KB Source | Accuracy | Cost/img |
+|-----------|----------|----------|
+| Local (Exp 20) | 42.6% (23/54) | $0.103 |
+| Internet — desc only | 44.4% (24/54) | $0.098 |
+| Internet — all cols | 42.6% (23/54) | $0.106 |
+
+All three are within the ~42-44% noise band. KB source and metadata richness are not the bottleneck.
+
+### Next steps
+- [ ] Investigate persistent 0% classes — what is the actual bottleneck? (KB quality, visual ambiguity, or prompt/reasoning?)
+- [ ] Multi-reference images per class (agent sees only 1 ref per class — maybe too little)
+- [ ] Enrich local KB extraction to include Pathogen and Type (update PDF extraction prompt) — low priority, metadata doesn't help accuracy
 
 ## Claude -p Reference
 

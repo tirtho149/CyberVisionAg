@@ -42,7 +42,7 @@ ENV_STRIP_PREFIXES = ("CLAUDE", "CURSOR", "MCP_CONNECTION", "VSCODE", "ELECTRON"
 
 # ── KB loading ─────────────────────────────────────────────────────────────────
 
-def load_kb(symptom_source: str, dataset_name: str) -> str | None:
+def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -> str | None:
     """Load KB text from the specified source."""
     if symptom_source == "none":
         return None
@@ -59,7 +59,7 @@ def load_kb(symptom_source: str, dataset_name: str) -> str | None:
     if not xlsx_path.exists():
         print(f"  WARNING: {xlsx_path} not found, proceeding without KB")
         return None
-    return _load_xlsx_as_markdown(xlsx_path)
+    return _load_xlsx_as_markdown(xlsx_path, all_columns=all_columns)
 
 
 def _extract_crop_section(kb_file: Path, dataset_name: str) -> str:
@@ -103,17 +103,42 @@ def kb_coverage(symptom_source: str, dataset_name: str, classes: list[str]) -> d
     return {cls: True for cls in classes}  # assume coverage for unknown sources
 
 
-def _load_xlsx_as_markdown(xlsx_path: Path) -> str:
-    """Convert xlsx (columns A=disease, E=visual description) to markdown."""
+def _load_xlsx_as_markdown(xlsx_path: Path, all_columns: bool = False) -> str:
+    """Convert xlsx to markdown.
+
+    Args:
+        xlsx_path: Path to the xlsx file.
+        all_columns: If True, include Pathogen, Type, Affected Parts in addition
+            to Visual Description. If False, only Visual Description (legacy).
+    """
     import openpyxl
     wb = openpyxl.load_workbook(xlsx_path, read_only=True)
     ws = wb.active
     lines = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         disease = row[0]
+        if not disease:
+            continue
         description = row[4] if len(row) > 4 else None
-        if disease and description:
-            lines.append(f"### {disease}\n{description}\n")
+        if not all_columns:
+            if description:
+                lines.append(f"### {disease}\n{description}\n")
+            continue
+        pathogen = row[1] if len(row) > 1 else None
+        disease_type = row[2] if len(row) > 2 else None
+        affected_parts = row[3] if len(row) > 3 else None
+        if not description and not affected_parts:
+            continue
+        entry = f"### {disease}\n"
+        if pathogen and str(pathogen).strip():
+            entry += f"**Pathogen**: {pathogen}\n"
+        if disease_type and str(disease_type).strip():
+            entry += f"**Type**: {disease_type}\n"
+        if affected_parts and str(affected_parts).strip():
+            entry += f"**Affected parts**: {affected_parts}\n"
+        if description and str(description).strip():
+            entry += f"{description}\n"
+        lines.append(entry)
     wb.close()
     return "\n".join(lines)
 
@@ -553,6 +578,8 @@ def main():
                         help=f"Per-image timeout in seconds (default: {TIMEOUT_S})")
     parser.add_argument("--exclude", type=str, default=None,
                         help="Comma-separated class names to exclude")
+    parser.add_argument("--all-kb-columns", action="store_true",
+                        help="Include Pathogen, Type, Affected Parts in KB (not just Visual Description)")
     args = parser.parse_args()
 
     # Quick-test shortcut
@@ -569,7 +596,7 @@ def main():
     ref_images = find_reference_images(args.dataset, classes)
 
     # Load KB
-    kb_text = load_kb(args.symptom_source, args.dataset)
+    kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
 
     # Setup logging
     log_dir = RESULTS_DIR / args.symptom_source / "logs" / args.dataset
