@@ -628,10 +628,22 @@ Future sweeps (same script, change SOURCE variable):
 
 **Finding**: Collage is consistently better or equal. Key improvements at k=2 (+30pp) and k=4 (+20pp). The k=10 collapse (50% → 70%) is reduced but not eliminated. Each collage view gives the agent 4× more visual info per budget unit, so it needs fewer views to build a good mental model of each disease class.
 
+### k=10 regression analysis (collage)
+
+At k=10, Anthracnose and TSV regressed from correct (k=4) to wrong (both → Diaporthe). Trace analysis:
+- **k=4**: Agent views 3 refs, finds a strong match, commits. Correct.
+- **k=10**: Agent views 7-8 refs, finds superficial similarities with Diaporthe (both show stem symptoms), second-guesses itself, overrides correct first impression. **Overthinking problem.**
+
+The agent doesn't know when to stop. At high k it keeps exploring, finds plausible-but-wrong alternatives, and loses confidence. Fix: prompt to commit when confident rather than exhaust budget.
+
+### Changes
+- **Collage is now the default** (`--no-collage` to disable). All future experiments use collages.
+
 ### Next steps
-- [ ] Scale collage test to 27 classes × 2 images to validate at full scale
-- [ ] Run collage k sweep with Opus to see if model + collage stack
-- [ ] **Image-derived KB**: Generate visual descriptions by looking at training images instead of web text
+- [ ] Fix k=10 overthinking — prompt change to commit early when confident
+- [ ] Scale collage to 27 classes × 2 images to validate
+- [ ] Run collage k sweep with Opus
+- [ ] **Image-derived KB**: Generate visual descriptions by looking at training images
 - [ ] KB improvement loop — parked
 - [ ] Full model × k sweep for local/none KB sources
 

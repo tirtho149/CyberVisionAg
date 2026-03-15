@@ -642,8 +642,8 @@ def main():
                         help="Test images per class")
     parser.add_argument("--quick-test", type=int, default=None, metavar="N",
                         help="Shortcut: num-classes=N, images-per-class=1")
-    parser.add_argument("--collage", action="store_true",
-                        help="Use 2x2 collage of 4 training images as reference (1 view = 4 images)")
+    parser.add_argument("--no-collage", action="store_true",
+                        help="Use single training images instead of collages (default: collage)")
     parser.add_argument("--refs-per-class", type=int, default=1,
                         help="Reference images per class (default: 1, max: 5)")
     parser.add_argument("--k", type=int, default=None,
@@ -677,10 +677,10 @@ def main():
     classes, test_images = load_dataset(
         args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
     )
-    if args.collage:
-        ref_images = make_collages(args.dataset, classes)
-    else:
+    if args.no_collage:
         ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
+    else:
+        ref_images = make_collages(args.dataset, classes)
 
     # Load KB
     if args.kb_file:
