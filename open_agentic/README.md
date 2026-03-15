@@ -659,14 +659,85 @@ The agent doesn't know when to stop. At high k it keeps exploring, finds plausib
 4. 2 images/class is more stable than 1 image (less noise per run)
 5. Agent fully utilizes budget at every k level (refs ≈ k)
 
-**Open question**: Why is 27×1 accuracy (30-44%) significantly lower than 27×2 (37-50%)? With 1 image, 8/27 correct at k=1; with 2 images, 20/54 correct at k=1. The 2nd image per class seems to be easier — needs investigation.
+**Note on 1-img vs 2-img gap**: Investigated — `random.sample` with the same seed selects **different images** when drawing 1 vs 2 per class (RNG state diverges). Only 6/27 overlap. The gap is due to different test images, not a systematic effect.
 
-### Next steps
-- [ ] Investigate 1-img vs 2-img accuracy gap — which images are the "easy" ones?
-- [ ] Run collage k sweep with Opus to see if model + collage stack
-- [ ] **Image-derived KB**: Generate visual descriptions by looking at training images
-- [ ] KB improvement loop — parked
-- [ ] Full model × k sweep for local/none KB sources
+## Evaluation Plan
+
+### Fixed defaults
+
+All experiments use these unless explicitly varied:
+- **Refs**: Collage (2×2 grid of 4 training images) — always on
+- **Images/class**: 3 (for final results; 2 for quick iteration)
+- **Seed**: 42
+- **Parallel**: 12
+- **Dataset**: Soybean_Diseases, 27 classes (5 junk excluded)
+
+### Sweeps (one factor at a time)
+
+Each sweep varies **one factor** while holding others at default. This avoids combinatorial explosion (14 runs vs 108+ brute force).
+
+| Sweep | Varies | Fixed at | Runs | Status |
+|-------|--------|----------|:----:|--------|
+| **1. k sweep** | k=1,2,4,8,16,27 | sonnet, internet | 6 | done (Exp 28) |
+| **2. KB sweep** | none, local, internet | sonnet, k=8 | 3 | pending |
+| **3. Model sweep** | haiku, sonnet, opus | internet, k=8 | 3 | pending |
+| **4. Crop sweep** | soybean (+ future) | sonnet, internet, k=8 | N | future |
+
+**Total for soybean: 12 runs.** Sweep 1 already done (6 runs). Sweeps 2-3 need 6 more runs.
+
+### Results directory structure
+
+```
+results/open_agentic/{kb_source}/{model}/k{k}/{dataset}/
+  ├── *.json              # Per-image results
+  ├── traces/*.json       # Agent reasoning traces
+  └── summary.json        # Aggregate metrics
+```
+
+Example: `results/open_agentic/internet/sonnet/k8/Soybean_Diseases/`
+
+### Run commands
+
+```bash
+cd /path/to/AgCrawler
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
+
+# Sweep 1: k sweep (sonnet, internet) — DONE
+for k in 1 2 4 8 16 27; do
+  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+    --model sonnet --symptom-source internet \
+    --images-per-class 3 --k $k --parallel 12 --seed 42 \
+    --exclude "$EXCLUDE"
+done
+
+# Sweep 2: KB sweep (sonnet, k=8)
+for src in none local internet; do
+  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+    --model sonnet --symptom-source $src \
+    --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+    --exclude "$EXCLUDE"
+done
+
+# Sweep 3: Model sweep (internet, k=8)
+for model in haiku sonnet opus; do
+  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+    --model $model --symptom-source internet \
+    --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+    --exclude "$EXCLUDE"
+done
+```
+
+### Paper figures (planned)
+
+| Figure | Data source | X-axis | Lines/bars |
+|--------|-------------|--------|------------|
+| Accuracy vs k | Sweep 1 | k | single line |
+| Accuracy by KB source | Sweep 2 | KB source | bars |
+| Accuracy by model | Sweep 3 | model | bars |
+| Combined: model × KB | Sweeps 2+3 | KB source | one line per model |
+| Generalization | Sweep 4 | crop | bars |
 
 ## Claude -p Reference
 
