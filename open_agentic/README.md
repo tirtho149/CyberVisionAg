@@ -683,11 +683,12 @@ The agent doesn't know when to stop. At high k it keeps exploring, finds plausib
 
 ### What gets run
 
-14 unique configs (vs 54 if exhaustive grid). No duplicates — sonnet/internet/k=8 is shared between tables.
+18 unique configs (vs 54+ exhaustive grid). No duplicates — sonnet/internet/k=8 is shared between tables.
 
 ```
-Main table (12 runs):   sonnet × {none, local, internet} × {k=1, 4, 8, 16}
-Model ablation (2 runs): {haiku, opus} × internet × k=8
+Few-shot baseline (4 runs): k=1, 4, 8, 16 (single API call, no agent, no KB)
+Main table (12 runs):       sonnet × {none, local, internet} × {k=1, 4, 8, 16}
+Model ablation (2 runs):    {haiku, opus} × internet × k=8
 ```
 
 ### Fixed settings

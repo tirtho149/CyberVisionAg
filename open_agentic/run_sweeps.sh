@@ -26,8 +26,8 @@ COMMAND="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 
-# All 14 unique configs: model,kb,k
-CONFIGS=(
+# All unique configs: model,kb,k
+AGENTIC_CONFIGS=(
     # Main table: sonnet × 3 KB × 4 k values = 12
     "sonnet,none,1"
     "sonnet,none,4"
@@ -45,12 +45,14 @@ CONFIGS=(
     "haiku,internet,8"
     "opus,internet,8"
 )
+# Few-shot baseline: same k values as main table
+FEWSHOT_K_VALUES=(1 4 8 16)
 
 if [ -z "${COMMAND}" ]; then
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  run           Run all 14 configs"
+    echo "  run           Run all configs (14 agentic + 4 few-shot = 18)"
     echo "  run-missing   Run only configs without existing results"
     echo "  results       Print paper tables from stored results"
     echo "  clean         Remove ALL results (fresh start)"
@@ -74,9 +76,29 @@ run_single() {
     echo "${acc}  refs=${refs}  cost=${cost}  errors=${errors}"
 }
 
+run_fewshot() {
+    local k="$1"
+    echo -n "  few-shot | k=${k}: "
+    OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.few_shot \
+        --images-per-class "${IMAGES}" --k "${k}" \
+        --parallel "${PARALLEL}" --seed "${SEED}" \
+        --exclude "${EXCLUDE}" 2>&1) || true
+
+    acc=$(echo "${OUTPUT}" | grep "Accuracy" | head -1 | sed 's/.*: *//')
+    cost=$(echo "${OUTPUT}" | grep "Total cost" | head -1 | sed 's/.*: *//')
+    errors=$(echo "${OUTPUT}" | grep "Errors" | head -1 | sed 's/.*: *//')
+    echo "${acc}  cost=${cost}  errors=${errors}"
+}
+
 has_results() {
     local model="$1" src="$2" k="$3"
     local dir="${RESULTS_BASE}/${src}/${model}/k${k}"
+    [ -f "${dir}/summary.json" ]
+}
+
+has_fewshot_results() {
+    local k="$1"
+    local dir="${RESULTS_BASE}/few_shot/sonnet/k${k}"
     [ -f "${dir}/summary.json" ]
 }
 
@@ -106,7 +128,8 @@ if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
 
     ran=0
     skipped=0
-    for config in "${CONFIGS[@]}"; do
+    echo "--- Agentic configs ---"
+    for config in "${AGENTIC_CONFIGS[@]}"; do
         IFS=',' read -r model src k <<< "${config}"
         if [ "${COMMAND}" = "run-missing" ] && has_results "${model}" "${src}" "${k}"; then
             echo "  ${model} | ${src} | k=${k}: EXISTS (skipping)"
@@ -114,6 +137,18 @@ if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
             continue
         fi
         run_single "${model}" "${src}" "${k}"
+        ran=$((ran + 1))
+    done
+
+    echo ""
+    echo "--- Few-shot baseline ---"
+    for k in "${FEWSHOT_K_VALUES[@]}"; do
+        if [ "${COMMAND}" = "run-missing" ] && has_fewshot_results "${k}"; then
+            echo "  few-shot | k=${k}: EXISTS (skipping)"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        run_fewshot "${k}"
         ran=$((ran + 1))
     done
 
@@ -128,6 +163,13 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
     echo ""
     printf "%-20s | %15s | %15s | %15s | %15s\n" "Method" "k=1" "k=4" "k=8" "k=16"
     printf "%-20s-|-%15s-|-%15s-|-%15s-|-%15s\n" "--------------------" "---------------" "---------------" "---------------" "---------------"
+    # Few-shot baseline
+    fr1=$(read_accuracy sonnet "few_shot" 1)
+    fr4=$(read_accuracy sonnet "few_shot" 4)
+    fr8=$(read_accuracy sonnet "few_shot" 8)
+    fr16=$(read_accuracy sonnet "few_shot" 16)
+    printf "%-20s | %15s | %15s | %15s | %15s\n" "Few-shot baseline" "${fr1}" "${fr4}" "${fr8}" "${fr16}"
+    # Agentic methods
     for src in none local internet; do
         label="Agent"
         [ "${src}" = "none" ] && label="Agent (no KB)"
@@ -171,7 +213,8 @@ if [ "${COMMAND}" = "status" ]; then
     echo ""
     done_count=0
     missing_count=0
-    for config in "${CONFIGS[@]}"; do
+    echo "--- Agentic ---"
+    for config in "${AGENTIC_CONFIGS[@]}"; do
         IFS=',' read -r model src k <<< "${config}"
         if has_results "${model}" "${src}" "${k}"; then
             acc=$(read_accuracy "${model}" "${src}" "${k}")
@@ -183,7 +226,20 @@ if [ "${COMMAND}" = "status" ]; then
         fi
     done
     echo ""
-    echo "Done: ${done_count}/14, Missing: ${missing_count}/14"
+    echo "--- Few-shot ---"
+    for k in "${FEWSHOT_K_VALUES[@]}"; do
+        if has_fewshot_results "${k}"; then
+            acc=$(read_accuracy sonnet "few_shot" "${k}")
+            echo "  [done]    few-shot | k=${k} → ${acc}"
+            done_count=$((done_count + 1))
+        else
+            echo "  [missing] few-shot | k=${k}"
+            missing_count=$((missing_count + 1))
+        fi
+    done
+    total=$((${#AGENTIC_CONFIGS[@]} + ${#FEWSHOT_K_VALUES[@]}))
+    echo ""
+    echo "Done: ${done_count}/${total}, Missing: ${missing_count}/${total}"
 fi
 
 echo "=== Done ==="

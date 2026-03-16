@@ -292,9 +292,16 @@ def main():
         acc = stats["correct"] / stats["total"] * 100
         print(f"    {cls:30s} {acc:.0f}%")
 
-    # Save summary
-    log_dir = RESULTS_DIR / "few_shot" / "logs" / args.dataset
+    # Save per-image results + summary
+    log_dir = RESULTS_DIR / args.dataset / "few_shot" / "sonnet" / f"k{args.k}"
     log_dir.mkdir(parents=True, exist_ok=True)
+    # Clear prior results for this config
+    for old in log_dir.glob("*.json"):
+        old.unlink()
+    for r, (img_path, _) in zip(results, test_images):
+        img_name = Path(img_path).stem
+        with open(log_dir / f"{img_name}.json", "w") as f:
+            json.dump(r, f, indent=2)
     with open(log_dir / "summary.json", "w") as f:
         json.dump({
             "config": {"k": args.k, "num_classes": len(classes),
