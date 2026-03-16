@@ -857,6 +857,18 @@ bash CyberVisionAg/open_agentic/run_sweeps.sh results mango
 
 **KB generation**: `python -m disease_registry.pipeline --crop mango --track internet --disease-dir CyberVisionAg/Curated_Local_Dataset/train`
 
+### Potential storyline
+
+> The value of the agent isn't raw accuracy alone — it's the reasoning traces, explainability, and ability to incorporate external knowledge. Few-shot is a black box. The agent shows its work.
+
+The agent provides full reasoning traces (which references it compared, what visual features it observed, why it ruled out candidates). This interpretability is valuable in agricultural diagnostics where understanding *why* a diagnosis was made matters for treatment decisions.
+
 ### Notes
-- Collage tile size depends on smallest image in each class — corn may have smaller collages than soybean (272px vs 400px tiles). Worth noting but unlikely to explain the performance gap.
+- **Resolution mismatch**: Few-shot sends full-res images (~2000-3000px) inline via base64. Agent sees 400px collage tiles. This handicaps the agent — it still matches or beats few-shot despite lower resolution references.
+- Collage tile size depends on smallest image in each class — corn may have smaller collages than soybean (272px vs 400px tiles).
 - Soybean has 6/27 classes with no internet KB data (22% blind), corn only 2/31 (6%) — this likely explains why KB helps corn but not soybean.
+
+### Future TODO
+- [ ] Fix resolution mismatch: increase collage tile cap from 400px to 800px (one-line change in `make_collages`) so agent sees comparable resolution to few-shot
+- [ ] Re-run corn KB generation — was done with fixed env but worth verifying coverage improved
+- [ ] Multiple seeds (42, 123, 456) for error bars on final numbers

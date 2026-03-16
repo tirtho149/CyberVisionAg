@@ -26,7 +26,7 @@
 
 set -uo pipefail
 
-IMAGES=1   # test images per class (1=fast directional, 3=final paper)
+IMAGES=3   # test images per class (1=fast directional, 3=final paper)
 PARALLEL=12
 SEED=42
 COMMAND="${1:-}"
