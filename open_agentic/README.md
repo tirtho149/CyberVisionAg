@@ -773,15 +773,32 @@ Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
 
 Repeat the evaluation on **Corn_Diseases** (38 classes, 5 train imgs/class) to test generalization. No local PDF available, so KB sources are **none** and **internet** only.
 
+**Dataset cleanup** — exclude 7 junk/duplicate classes:
+
+| Problem | Classes | Action |
+|---------|---------|--------|
+| Duplicate | Head_smut, Head_smut_South_Africa | Keep Head_smut |
+| Duplicate | Stewarts_disease, Stewarts_wilt | Keep Stewarts_wilt |
+| Not a disease | Misc | Remove |
+| Mixed/ambiguous | Multiple_foliar_diseases | Remove |
+| Mixed/ambiguous | General_Mixed_Stalk_Rots | Remove |
+| Mixed/ambiguous | Ear_rots_General_Mixed | Remove |
+| Not a disease | Genetic_flecking_striping | Remove (genetic, not pathogen) |
+
+**Exclude**: `Head_smut_South_Africa,Stewarts_disease,Misc,Multiple_foliar_diseases,General_Mixed_Stalk_Rots,Ear_rots_General_Mixed,Genetic_flecking_striping`
+
+Clean set: **31 classes**.
+
 **Steps**:
 1. Generate internet KB for corn via disease_registry pipeline
-2. Run the same sweep configs adapted for corn (no local KB)
-3. Compare patterns with soybean
+2. Inspect KB coverage
+3. Run sweep configs adapted for corn (no local KB)
+4. Compare patterns with soybean
 
 **Corn sweep configs** (12 total):
 ```
 Few-shot baseline (4 runs):  k=1, 4, 8, 16
-Agentic (6 runs):            sonnet × {none, internet} × {k=1, 4, 8, 16}  (minus 2 shared)
+Agentic (8 runs):            sonnet × {none, internet} × {k=1, 4, 8, 16}  (none/internet shared at each k)
 Model ablation (2 runs):     {haiku, opus} × internet × k=8
 ```
 
@@ -792,11 +809,12 @@ source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
 python -m disease_registry.pipeline --crop corn --track internet \
-  --disease-dir CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases
+  --disease-dir CyberVisionAg/Curated_Local_Dataset/train
 ```
 
-**Step 2 — Run corn sweeps** (after KB is generated):
-Update `DATASET` in `run_sweeps.sh` to `Corn_Diseases`, remove local KB configs, then:
+**Step 1 — DONE.** `Corn_internet.xlsx` generated. KB coverage: 33/38 classes (missing: Downy_mildew, Maize_streak_virus + 3 excluded junk classes). After excluding 7 junk: **29/31 clean classes have KB data**.
+
+**Step 2 — Run corn sweeps**: Update `DATASET` and `EXCLUDE` in `run_sweeps.sh`, remove local KB configs, then:
 ```bash
 bash CyberVisionAg/open_agentic/run_sweeps.sh clean
 bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
