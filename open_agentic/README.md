@@ -741,3 +741,64 @@ results/open_agentic/{crop}/{kb_source}/{model}/k{k}/
 ```
 
 Example: `results/open_agentic/Soybean_Diseases/internet/sonnet/k8/`
+
+### Soybean results (IMAGES=1, directional)
+
+**Table 1 — Method × k (sonnet, 27 classes × 1 image)**
+
+| Method | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|
+| Few-shot baseline | 30% | 33% | 33% | 41% |
+| Agent (no KB) | 33% | 44% | 41% | **52%** |
+| Agent + local KB | 37% | 37% | 44% | 37% |
+| Agent + internet KB | 37% | 33% | 37% | 41% |
+
+**Table 2 — Model ablation (internet KB, k=8)**
+
+| Model | Accuracy |
+|-------|:-:|
+| Haiku | 26% |
+| Sonnet | 37% |
+| Opus | **56%** |
+
+**Key findings**:
+1. **Agent > few-shot** at every k (+11pp at k=16)
+2. **Model quality is the strongest lever**: haiku 26% → opus 56% (+30pp)
+3. **Agent (no KB) scales best with k**: 33% → 52% — visual comparison is the value, not text KB
+4. **KB doesn't improve over no-KB** with collage refs — collage provides sufficient visual info, making text descriptions redundant
+
+## Next: Corn crop (in progress)
+
+### Plan
+
+Repeat the evaluation on **Corn_Diseases** (38 classes, 5 train imgs/class) to test generalization. No local PDF available, so KB sources are **none** and **internet** only.
+
+**Steps**:
+1. Generate internet KB for corn via disease_registry pipeline
+2. Run the same sweep configs adapted for corn (no local KB)
+3. Compare patterns with soybean
+
+**Corn sweep configs** (12 total):
+```
+Few-shot baseline (4 runs):  k=1, 4, 8, 16
+Agentic (6 runs):            sonnet × {none, internet} × {k=1, 4, 8, 16}  (minus 2 shared)
+Model ablation (2 runs):     {haiku, opus} × internet × k=8
+```
+
+**Step 1 — Generate corn internet KB**:
+```bash
+cd /path/to/AgCrawler
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+
+python -m disease_registry.pipeline --crop corn --track internet \
+  --disease-dir CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases
+```
+
+**Step 2 — Run corn sweeps** (after KB is generated):
+Update `DATASET` in `run_sweeps.sh` to `Corn_Diseases`, remove local KB configs, then:
+```bash
+bash CyberVisionAg/open_agentic/run_sweeps.sh clean
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
+bash CyberVisionAg/open_agentic/run_sweeps.sh results
+```
