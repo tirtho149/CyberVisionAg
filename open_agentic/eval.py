@@ -261,7 +261,7 @@ def make_collages(
         # Resize all to same size (use smallest dimensions)
         w = min(im.width for im in pil_imgs)
         h = min(im.height for im in pil_imgs)
-        size = (min(w, 400), min(h, 400))  # cap at 400px per tile
+        size = (min(w, 800), min(h, 800))  # cap at 800px per tile
         pil_imgs = [im.resize(size) for im in pil_imgs]
         cols = 2
         rows = (len(pil_imgs) + 1) // 2
