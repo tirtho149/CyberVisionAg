@@ -45,9 +45,14 @@ setup_crop() {
             EXCLUDE="Head_smut_South_Africa,Stewarts_disease,Misc,Multiple_foliar_diseases,General_Mixed_Stalk_Rots,Ear_rots_General_Mixed,Genetic_flecking_striping"
             KB_SOURCES=("none" "internet")
             ;;
+        mango)
+            DATASET="Mango_Leaf_Disease"
+            EXCLUDE=""
+            KB_SOURCES=("none" "internet")
+            ;;
         *)
             echo "Unknown crop: ${CROP}"
-            echo "Available: soybean, corn"
+            echo "Available: soybean, corn, mango"
             exit 1
             ;;
     esac

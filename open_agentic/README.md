@@ -814,9 +814,49 @@ python -m disease_registry.pipeline --crop corn --track internet \
 
 **Step 1 — DONE.** `Corn_internet.xlsx` generated. KB coverage: 33/38 classes (missing: Downy_mildew, Maize_streak_virus + 3 excluded junk classes). After excluding 7 junk: **29/31 clean classes have KB data**.
 
-**Step 2 — Run corn sweeps**: Update `DATASET` and `EXCLUDE` in `run_sweeps.sh`, remove local KB configs, then:
+**Step 2 — DONE.** Corn sweep complete (14 configs, IMAGES=1). Results:
+
+| Method | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|
+| Few-shot | 29% | 36% | 45% | 36% |
+| Agent (no KB) | 36% | 55% | 61% | 61% |
+| Agent + internet | 45% | 58% | 61% | **74%** |
+
+Model ablation: haiku 39%, sonnet 61%, opus 71%.
+
+## Execution plan (deadline day)
+
+**Run order** (all via `run_sweeps.sh`):
+1. [x] Mango IMAGES=1 — directional numbers (in progress)
+2. [ ] Corn IMAGES=3 — final numbers
+3. [ ] Mango IMAGES=3 — final numbers
+4. [ ] Soybean IMAGES=3 — final numbers
+
 ```bash
-bash CyberVisionAg/open_agentic/run_sweeps.sh clean
-bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing
-bash CyberVisionAg/open_agentic/run_sweeps.sh results
+# Step 1: Mango directional (IMAGES=1 in run_sweeps.sh)
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing mango
+
+# Step 2-4: Change IMAGES=3, clean each crop, re-run
+# (change IMAGES=3 in run_sweeps.sh first)
+echo y | bash CyberVisionAg/open_agentic/run_sweeps.sh clean corn
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing corn
+echo y | bash CyberVisionAg/open_agentic/run_sweeps.sh clean mango
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing mango
+echo y | bash CyberVisionAg/open_agentic/run_sweeps.sh clean soybean
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing soybean
+
+# Print all results
+bash CyberVisionAg/open_agentic/run_sweeps.sh results soybean
+bash CyberVisionAg/open_agentic/run_sweeps.sh results corn
+bash CyberVisionAg/open_agentic/run_sweeps.sh results mango
 ```
+
+### Mango_Leaf_Disease
+
+7 classes (no exclusions), no local PDF. KB sources: none, internet.
+
+**KB generation**: `python -m disease_registry.pipeline --crop mango --track internet --disease-dir CyberVisionAg/Curated_Local_Dataset/train`
+
+### Notes
+- Collage tile size depends on smallest image in each class — corn may have smaller collages than soybean (272px vs 400px tiles). Worth noting but unlikely to explain the performance gap.
+- Soybean has 6/27 classes with no internet KB data (22% blind), corn only 2/31 (6%) — this likely explains why KB helps corn but not soybean.
