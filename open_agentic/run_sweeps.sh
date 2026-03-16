@@ -1,70 +1,96 @@
 #!/usr/bin/env bash
-# Run all unique evaluation configs and print results.
-#
-# Runs 14 unique (model, kb, k) combinations. Results are stored in
-# results/open_agentic/{crop}/{kb}/{model}/k{k}/ and can be read by
-# the results command without re-running.
+# Run evaluation sweeps for any crop dataset.
 #
 # Usage:
 #   cd /path/to/AgCrawler
 #   source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 #   set -a && source .env && set +a
 #
-#   bash CyberVisionAg/open_agentic/run_sweeps.sh run          # run all 14 configs
-#   bash CyberVisionAg/open_agentic/run_sweeps.sh results      # print tables from stored results
-#   bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing   # only run configs without results
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh <command> <crop>
+#
+# Commands:
+#   run-missing   Run only configs without existing results (resumable)
+#   run           Run all configs (overwrites existing)
+#   results       Print paper tables from stored results
+#   status        Show which configs have results
+#   clean         Remove ALL results for this crop
+#
+# Crops:
+#   soybean       Soybean_Diseases (27 clean classes, KB: none/local/internet)
+#   corn          Corn_Diseases (31 clean classes, KB: none/internet)
+#
+# Examples:
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing soybean
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh results corn
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh status soybean
 
 set -uo pipefail
 
-EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
 IMAGES=1   # test images per class (1=fast directional, 3=final paper)
 PARALLEL=12
 SEED=42
-DATASET="Soybean_Diseases"
 COMMAND="${1:-}"
+CROP="${2:-}"
+
+# ── Crop-specific settings ────────────────────────────────────────────────────
+setup_crop() {
+    case "${CROP}" in
+        soybean)
+            DATASET="Soybean_Diseases"
+            EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
+            KB_SOURCES=("none" "local" "internet")
+            ;;
+        corn)
+            DATASET="Corn_Diseases"
+            EXCLUDE="Head_smut_South_Africa,Stewarts_disease,Misc,Multiple_foliar_diseases,General_Mixed_Stalk_Rots,Ear_rots_General_Mixed,Genetic_flecking_striping"
+            KB_SOURCES=("none" "internet")
+            ;;
+        *)
+            echo "Unknown crop: ${CROP}"
+            echo "Available: soybean, corn"
+            exit 1
+            ;;
+    esac
+}
+
+if [ -z "${COMMAND}" ] || [ -z "${CROP}" ]; then
+    echo "Usage: $0 <command> <crop>"
+    echo ""
+    echo "Commands: run, run-missing, results, status, clean"
+    echo "Crops:    soybean, corn"
+    echo ""
+    echo "Examples:"
+    echo "  $0 run-missing soybean"
+    echo "  $0 results corn"
+    exit 1
+fi
+
+setup_crop
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 
-# All unique configs: model,kb,k
-AGENTIC_CONFIGS=(
-    # Main table: sonnet × 3 KB × 4 k values = 12
-    "sonnet,none,1"
-    "sonnet,none,4"
-    "sonnet,none,8"
-    "sonnet,none,16"
-    "sonnet,local,1"
-    "sonnet,local,4"
-    "sonnet,local,8"
-    "sonnet,local,16"
-    "sonnet,internet,1"
-    "sonnet,internet,4"
-    "sonnet,internet,8"    # shared with model ablation
-    "sonnet,internet,16"
-    # Model ablation: haiku + opus at internet/k=8 = 2 (sonnet already above)
-    "haiku,internet,8"
-    "opus,internet,8"
-)
-# Few-shot baseline: same k values as main table
+# Build configs dynamically based on crop's KB sources
+AGENTIC_CONFIGS=()
+for src in "${KB_SOURCES[@]}"; do
+    for k in 1 4 8 16; do
+        AGENTIC_CONFIGS+=("sonnet,${src},${k}")
+    done
+done
+# Model ablation: haiku + opus at internet/k=8
+AGENTIC_CONFIGS+=("haiku,internet,8")
+AGENTIC_CONFIGS+=("opus,internet,8")
+# Deduplicate (sonnet,internet,8 already exists from the loop)
+
 FEWSHOT_K_VALUES=(1 4 8 16)
 
-if [ -z "${COMMAND}" ]; then
-    echo "Usage: $0 <command>"
-    echo ""
-    echo "Commands:"
-    echo "  run           Run all configs (14 agentic + 4 few-shot = 18)"
-    echo "  run-missing   Run only configs without existing results"
-    echo "  results       Print paper tables from stored results"
-    echo "  clean         Remove ALL results (fresh start)"
-    echo "  status        Show which configs have results"
-    exit 1
-fi
-
+# ── Helper functions ──────────────────────────────────────────────────────────
 run_single() {
     local model="$1" src="$2" k="$3"
     echo -n "  ${model} | ${src} | k=${k}: "
     OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
         --model "${model}" --symptom-source "${src}" \
+        --dataset "${DATASET}" \
         --images-per-class "${IMAGES}" --k "${k}" \
         --parallel "${PARALLEL}" --seed "${SEED}" \
         --exclude "${EXCLUDE}" 2>&1) || true
@@ -80,6 +106,7 @@ run_fewshot() {
     local k="$1"
     echo -n "  few-shot | k=${k}: "
     OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.few_shot \
+        --dataset "${DATASET}" \
         --images-per-class "${IMAGES}" --k "${k}" \
         --parallel "${PARALLEL}" --seed "${SEED}" \
         --exclude "${EXCLUDE}" 2>&1) || true
@@ -92,14 +119,12 @@ run_fewshot() {
 
 has_results() {
     local model="$1" src="$2" k="$3"
-    local dir="${RESULTS_BASE}/${src}/${model}/k${k}"
-    [ -f "${dir}/summary.json" ]
+    [ -f "${RESULTS_BASE}/${src}/${model}/k${k}/summary.json" ]
 }
 
 has_fewshot_results() {
     local k="$1"
-    local dir="${RESULTS_BASE}/few_shot/sonnet/k${k}"
-    [ -f "${dir}/summary.json" ]
+    [ -f "${RESULTS_BASE}/few_shot/sonnet/k${k}/summary.json" ]
 }
 
 read_accuracy() {
@@ -120,16 +145,21 @@ print(f'{n}/{t} ({acc:.1f}%)')
     fi
 }
 
-# ── Run commands ──────────────────────────────────────────────────────────────
+# ── Run ───────────────────────────────────────────────────────────────────────
 if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
-    echo "=== Running evaluation configs ==="
-    echo "Dataset: ${DATASET}, images/class: ${IMAGES}, seed: ${SEED}"
+    echo "=== Running: ${DATASET} (images/class: ${IMAGES}, seed: ${SEED}) ==="
     echo ""
 
     ran=0
     skipped=0
+
     echo "--- Agentic configs ---"
+    seen=()
     for config in "${AGENTIC_CONFIGS[@]}"; do
+        # Deduplicate
+        if [[ " ${seen[*]:-} " == *" ${config} "* ]]; then continue; fi
+        seen+=("${config}")
+
         IFS=',' read -r model src k <<< "${config}"
         if [ "${COMMAND}" = "run-missing" ] && has_results "${model}" "${src}" "${k}"; then
             echo "  ${model} | ${src} | k=${k}: EXISTS (skipping)"
@@ -157,22 +187,21 @@ if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
     echo ""
 fi
 
-# ── Print results tables ─────────────────────────────────────────────────────
+# ── Results ───────────────────────────────────────────────────────────────────
 if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
-    echo "=== Table 1: Method × k (sonnet) ==="
+    echo "=== Table 1: Method × k — ${DATASET} (sonnet) ==="
     echo ""
     printf "%-20s | %15s | %15s | %15s | %15s\n" "Method" "k=1" "k=4" "k=8" "k=16"
     printf "%-20s-|-%15s-|-%15s-|-%15s-|-%15s\n" "--------------------" "---------------" "---------------" "---------------" "---------------"
-    # Few-shot baseline
+    # Few-shot
     fr1=$(read_accuracy sonnet "few_shot" 1)
     fr4=$(read_accuracy sonnet "few_shot" 4)
     fr8=$(read_accuracy sonnet "few_shot" 8)
     fr16=$(read_accuracy sonnet "few_shot" 16)
     printf "%-20s | %15s | %15s | %15s | %15s\n" "Few-shot baseline" "${fr1}" "${fr4}" "${fr8}" "${fr16}"
-    # Agentic methods
-    for src in none local internet; do
-        label="Agent"
-        [ "${src}" = "none" ] && label="Agent (no KB)"
+    # Agentic by KB source
+    for src in "${KB_SOURCES[@]}"; do
+        label="Agent (no KB)"
         [ "${src}" = "local" ] && label="Agent + local KB"
         [ "${src}" = "internet" ] && label="Agent + internet KB"
         r1=$(read_accuracy sonnet "${src}" 1)
@@ -183,7 +212,7 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
     done
     echo ""
 
-    echo "=== Table 2: Model Ablation (internet KB, k=8) ==="
+    echo "=== Table 2: Model Ablation — ${DATASET} (internet KB, k=8) ==="
     echo ""
     printf "%-10s | %15s\n" "Model" "Accuracy"
     printf "%-10s-|-%15s\n" "----------" "---------------"
@@ -194,7 +223,7 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
     echo ""
 fi
 
-# ── Clean: remove all results ─────────────────────────────────────────────────
+# ── Clean ─────────────────────────────────────────────────────────────────────
 if [ "${COMMAND}" = "clean" ]; then
     echo "=== Cleaning all results for ${DATASET} ==="
     echo "This will delete: ${RESULTS_BASE}/"
@@ -207,14 +236,18 @@ if [ "${COMMAND}" = "clean" ]; then
     fi
 fi
 
-# ── Status: show which configs have results ───────────────────────────────────
+# ── Status ────────────────────────────────────────────────────────────────────
 if [ "${COMMAND}" = "status" ]; then
     echo "=== Status: ${DATASET} ==="
     echo ""
     done_count=0
     missing_count=0
+
     echo "--- Agentic ---"
+    seen=()
     for config in "${AGENTIC_CONFIGS[@]}"; do
+        if [[ " ${seen[*]:-} " == *" ${config} "* ]]; then continue; fi
+        seen+=("${config}")
         IFS=',' read -r model src k <<< "${config}"
         if has_results "${model}" "${src}" "${k}"; then
             acc=$(read_accuracy "${model}" "${src}" "${k}")
@@ -237,7 +270,7 @@ if [ "${COMMAND}" = "status" ]; then
             missing_count=$((missing_count + 1))
         fi
     done
-    total=$((${#AGENTIC_CONFIGS[@]} + ${#FEWSHOT_K_VALUES[@]}))
+    total=$((done_count + missing_count))
     echo ""
     echo "Done: ${done_count}/${total}, Missing: ${missing_count}/${total}"
 fi
