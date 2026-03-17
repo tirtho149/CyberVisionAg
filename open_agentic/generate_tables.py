@@ -38,6 +38,20 @@ def _fmt(acc, bold=False):
     return s
 
 
+def _fmt_with_delta(acc, baseline, bold=False):
+    """Format as 'X.Y% (+D.D)' showing both accuracy and delta from baseline."""
+    if acc is None:
+        return "—"
+    s = f"{acc:.1f}\\%"
+    if baseline is not None:
+        delta = acc - baseline
+        sign = "+" if delta >= 0 else ""
+        s += f" ({sign}{delta:.1f})"
+    if bold:
+        s = f"\\textbf{{{s}}}"
+    return s
+
+
 def _fmt_delta(acc, baseline, bold=False):
     """Format as delta from baseline: '+X.Y' or '—'."""
     if acc is None or baseline is None:
@@ -70,7 +84,7 @@ def table_main_results():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Diagnostic accuracy (\%) across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Zero-shot uses no reference images. Best per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. Values show accuracy\,\% with improvement over zero-shot in parentheses. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:main_results}")
     lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
@@ -78,32 +92,31 @@ def table_main_results():
     lines.append(r"\midrule")
 
     for crop_id, crop_label, sources in crops:
-        # Collect all results for this crop to find best per k
-        all_methods = {}
         zs = _load(crop_id, "few_shot", "sonnet", 0)
-        all_methods["Zero-shot"] = {k: zs for k in ks}
+
+        # Collect all agent results to find best per k
+        all_results = {}
         for source in sources:
             label = method_labels[source]
-            all_methods[label] = {k: _load(crop_id, source, "sonnet", k) for k in ks}
+            all_results[label] = {k: _load(crop_id, source, "sonnet", k) for k in ks}
 
-        # Find best per k
         best_per_k = {}
         for k in ks:
-            vals = [all_methods[m][k] for m in all_methods if all_methods[m][k] is not None]
+            vals = [all_results[m][k] for m in all_results if all_results[m][k] is not None]
             best_per_k[k] = max(vals) if vals else -1
 
-        # Zero-shot row (same value across all k)
+        # Zero-shot row
         zs_str = _fmt(zs)
         lines.append(f"{crop_label} & Zero-shot & " + " & ".join([zs_str] * len(ks)) + r" \\")
 
-        # Agent rows
+        # Agent rows with delta from zero-shot
         for source in sources:
             label = method_labels[source]
             cells = []
             for k in ks:
-                acc = all_methods[label][k]
+                acc = all_results[label][k]
                 is_best = acc is not None and abs(acc - best_per_k[k]) < 0.01
-                cells.append(_fmt(acc, bold=is_best))
+                cells.append(_fmt_with_delta(acc, zs, bold=is_best))
             lines.append(f" & {label} & " + " & ".join(cells) + r" \\")
 
         lines.append(r"\midrule")
@@ -244,10 +257,7 @@ def main():
     out.write_text(tex)
     print(f"  Model ablation → {out.name}")
 
-    tex = table_appendix_delta()
-    out = TABLES_OUT / "table_appendix_full.tex"
-    out.write_text(tex)
-    print(f"  Appendix delta → {out.name}")
+    # Appendix table removed — main text table with deltas covers it
 
 
 if __name__ == "__main__":
