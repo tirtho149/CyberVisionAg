@@ -89,9 +89,6 @@ def trace_to_tex(
                 continue
             step_num += 1
             escaped = _escape_latex(content)
-            # Wrap long text
-            if len(escaped) > 500:
-                escaped = escaped[:500] + r" [\ldots]"
             steps.append(f"\\item[Step {step_num}:] {escaped}")
 
     steps_tex = "\n    ".join(steps)
@@ -167,9 +164,11 @@ def main():
     print()
 
     # ── In-text trace: one correct example, soybean, internet KB, k=4 ────
+    intext_key = None
     correct, incorrect = find_examples("Soybean_Diseases", "internet", "sonnet", 4)
     if correct:
-        tex = trace_to_tex("Soybean_Diseases", "internet", "sonnet", 4, correct[0])
+        intext_key = ("Soybean_Diseases", "internet", "sonnet", 4, correct[0])
+        tex = trace_to_tex(*intext_key)
         out = TRACES_OUT / "trace_intext.tex"
         out.write_text(tex)
         print(f"  In-text trace (correct): {correct[0]} → {out.name}")
@@ -191,7 +190,9 @@ def main():
     for crop, kb, model, k in appendix_configs:
         corr, incorr = find_examples(crop, kb, model, k, n_correct=1, n_incorrect=1)
         for name in corr:
-            appendix_traces.append((crop, kb, model, k, name))
+            key = (crop, kb, model, k, name)
+            if key != intext_key:  # skip the in-text trace
+                appendix_traces.append(key)
         for name in incorr:
             appendix_traces.append((crop, kb, model, k, name))
 
