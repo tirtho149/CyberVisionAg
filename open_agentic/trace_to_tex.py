@@ -67,6 +67,21 @@ def trace_to_tex(
 
     outcome = r"\textcolor{green!60!black}{\textbf{Correct}}" if correct else r"\textcolor{red}{\textbf{Incorrect}}"
 
+    # Copy test image (small thumbnail) to traces/images/
+    img_tex = ""
+    test_class = result.get("test_image", ground_truth)
+    src_img = SCRIPT_DIR.parent / "Curated_Local_Dataset" / "test" / crop / test_class / f"{image_name}.jpg"
+    if src_img.exists():
+        from PIL import Image as PILImage
+        img_out_dir = TRACES_OUT / "images"
+        img_out_dir.mkdir(parents=True, exist_ok=True)
+        img_out = img_out_dir / f"{image_name}.jpg"
+        # Resize to small thumbnail
+        im = PILImage.open(src_img)
+        im.thumbnail((150, 150))
+        im.save(img_out, quality=80)
+        img_tex = rf"\includegraphics[height=2.5cm]{{traces/images/{image_name}.jpg}}"
+
     # Build step-by-step content
     steps = []
     step_num = 0
@@ -105,6 +120,7 @@ def trace_to_tex(
         fonttitle=\small,
     ]
     \small
+    \begin{{minipage}}[t]{{0.65\linewidth}}
     \begin{{tabular}}{{@{{}}ll@{{}}}}
         \textbf{{Model:}} & {model} \\
         \textbf{{KB source:}} & {kb_display} \\
@@ -114,6 +130,12 @@ def trace_to_tex(
         \textbf{{Outcome:}} & {outcome} \\
         \textbf{{Confidence:}} & {confidence:.2f} \\
     \end{{tabular}}
+    \end{{minipage}}%
+    \hfill
+    \begin{{minipage}}[t]{{0.30\linewidth}}
+    \raggedleft
+    {img_tex}
+    \end{{minipage}}
 
     \vspace{{4pt}}
     \hrule
