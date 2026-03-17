@@ -137,6 +137,9 @@ python -m CyberVisionAg.open_agentic.generate_figures
 # Regenerate all traces (outputs to writing/.../traces/)
 python -m CyberVisionAg.open_agentic.trace_to_tex
 
+# Regenerate all tables (outputs to writing/.../tables/)
+python -m CyberVisionAg.open_agentic.generate_tables
+
 # Recompile paper
 cd writing/69aae430e8bdcbd9056bf911 && pdflatex -interaction=nonstopmode main.tex
 
@@ -218,22 +221,23 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [x] Commit final results
 
 ### Phase 2: Generate figures
-- [ ] Create `CyberVisionAg/open_agentic/generate_figures.py` (reads directly from summary JSONs + `all-crops.xlsx`)
-- [ ] Figure 3: Dataset scale + agentic flow (multi-panel: crop distribution from xlsx + system flow)
-- [ ] Figure 4: Accuracy vs k line plots (1x3 panel) with zero-shot floor + per-class std bands
-- [ ] Figure 5: Model scaling + KB comparison (combined dense panel with std error bars)
-- [ ] Figure 6: Per-class accuracy heatmap
-- [ ] All plots must read from raw data files — no hardcoded numbers
-- [ ] Save all as PDF in `writing/69aae430e8bdcbd9056bf911/figures/`
-- [ ] Review all figures for consistency with `plotting_instructions.md`
+- [x] Create `CyberVisionAg/open_agentic/generate_figures.py` (reads directly from summary JSONs + `all-crops.xlsx`)
+- [x] Figure 3: Sunburst — crop-disease hierarchy (Plotly, exported via kaleido)
+- [x] Figure 4: Accuracy vs k line plots (1x3 panel) with zero-shot floor
+- [x] Figure 5: Model scaling + KB comparison (1x2 combined panel)
+- [ ] Figure 6: Per-class accuracy heatmap (deferred)
+- [x] All plots read from raw data files — no hardcoded numbers
+- [x] Saved as PDF in `writing/69aae430e8bdcbd9056bf911/figures/`
+- [x] Integrated into main.tex at correct positions
 
 ### Phase 3: Reasoning trace pipeline
-- [ ] Write `CyberVisionAg/open_agentic/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
-- [ ] Each `.tex` file clearly displays: config (k, model, KB source), step-by-step reasoning, prediction, ground truth
-- [ ] Output to `writing/69aae430e8bdcbd9056bf911/traces/`
-- [ ] main.tex uses `\input{traces/trace_example_1.tex}` to include (maybe for lower value of k since it'll be in text)
-- [ ] Start with 2 traces: one correct, one incorrect
-- [ ] Expand later: multiple crops, KB sources, k values, models — systematically organized. These will be all in the appendix.
+- [x] Write `CyberVisionAg/open_agentic/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
+- [x] Each `.tex` file displays: config (k, model, KB source), test image thumbnail, step-by-step reasoning, prediction, ground truth
+- [x] Output to `writing/69aae430e8bdcbd9056bf911/traces/` with images in `traces/images/`
+- [x] main.tex uses `\input{traces/trace_intext.tex}` for in-text example (soybean, internet KB, k=4)
+- [x] 1 in-text trace + 15 appendix traces (no duplication)
+- [x] Appendix included via `\input{traces/traces_appendix.tex}`
+- [ ] Expand later: more crops, KB sources, k values, models as needed
 
 ### Phase 4: Write the paper (in main.tex)
 - [ ] Update Section 1: Introduction (align with storyline)
