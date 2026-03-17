@@ -8,7 +8,7 @@
 
 ## Big Picture
 
-We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~350,000 images across ~350 crops and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 27 classes, Corn 24 classes, Mango 7 classes) — chosen to represent different scales of difficulty. Evaluation on additional crops is planned but limited by the compute-intensive nature of agentic inference.
+We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~670,000 images across 56 crops (478 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 27 classes, Corn 24 classes, Mango 7 classes) — chosen to represent different scales of difficulty. Evaluation on additional crops is planned but limited by the compute-intensive nature of agentic inference.
 
 The system is designed around **explainability**: every diagnosis produces a full reasoning trace showing which references were examined, what visual features were observed, and how alternatives were ruled out. In agricultural diagnostics, knowing *why* matters for treatment decisions and for the farmer or extension agent to visually verify the diagnosis.
 
@@ -17,8 +17,9 @@ The system is designed around **explainability**: every diagnosis produces a ful
 ## Contributions
 
 ### 1. Large-scale multi-crop image dataset
-- ~350,000 images across ~350 crops, multi-organ (leaf, stem, root, seed, ear, head)
-Located in : CyberVisionAg/open_agentic/all-crops.xlsx
+- ~670,000 images across 56 crops, 478 disease classes, multi-organ (leaf, stem, root, seed, ear, head)
+- Data distribution: `CyberVisionAg/open_agentic/all-crops.xlsx` (3 sheets: By Crop & Disease, Summary, Image Sources)
+- Sources: Internal (expert-curated), PlantVillage, LeafNet, CDDM, New Plant Diseases, and others
 - Curated train/test splits for the three evaluation crops
 - Will be made publicly available
 
@@ -91,7 +92,8 @@ Located in : CyberVisionAg/open_agentic/all-crops.xlsx
 - Datasets and setup
 - Zero-shot baseline
 - Ablations: k values, KB source, model scaling
-- Metrics: accuracy, per-class accuracy, cost, avg turns, refs viewed
+- Metrics: accuracy, per-class accuracy (mean + std across classes), cost, avg turns, refs viewed
+- Per-class std captures instability / variance across disease classes
 - Results and analysis
 - Qualitative: example reasoning traces
 
@@ -112,6 +114,17 @@ Located in : CyberVisionAg/open_agentic/all-crops.xlsx
 
 All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PDF output).
 
+**Data-driven principle**: All plots read directly from raw data files (summary JSONs, `all-crops.xlsx`). If data is updated or experiments are rerun, plots can be regenerated automatically without manual edits.
+
+**Inspect protocol**: When reviewing any figure, generate 4 quadrant crops (top-left, top-right, bottom-left, bottom-right) as separate images to check for label clipping, text overlap, rotation issues, and readability at print scale. Trigger with the word "inspect".
+
+**Figure generation principles**:
+- Research standard approaches online before hand-rolling complex visualizations.
+- Use the right tool for the job — don't force one library to do everything.
+- For overlaid text on charts, add a semi-transparent background for readability.
+- Merge long tails into "+N more" entries to avoid visual noise.
+- Always export at high resolution for publication quality.
+
 ### Figure 1: System Overview (already in main.tex as `fig:overview`)
 - Block diagram: Crop name → Registry pipeline → Disease Registry → Agent + Images → Prediction
 - Already implemented in TikZ
@@ -120,32 +133,42 @@ All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PD
 - Discovery → Extraction → Reconciliation with per-field citation example
 - Already implemented in TikZ
 
-### Figure 3: Main Results Panel (dense, multi-dimensional)
+### Figure 3: Dataset Scale + Agentic Flow (combined multi-panel)
+- **Type**: Multi-panel figure combining data overview and system flow
+- **Panel A**: Bar chart of top crops by image count (from `all-crops.xlsx`)
+- **Panel B**: Distribution of diseases per crop or images per disease (histogram)
+- **Panel C**: Agentic prediction flow diagram — test image → agent reasoning steps → prediction (simplified visual)
+- **Config**: `figsize=(13, 5)` or similar dense layout
+- **Data source**: Reads directly from `all-crops.xlsx` — updates automatically if data changes
+- **Purpose**: Show scale of data and how the system works in one dense figure
+
+### Figure 4: Main Results Panel (dense, multi-dimensional)
 - **Type**: 1x3 line plot panel (one per crop)
 - **Config**: `figsize=(13, 4)`, large rcParams
 - **Lines**: Agent no-KB, Agent+internet KB (+ Agent+local KB for soybean)
 - **Horizontal dashed line**: Zero-shot floor
 - **X-axis**: k (1, 4, 8, 16)
 - **Y-axis**: Accuracy (%)
-- **Purpose**: Show lift over zero-shot, scaling with k, KB contribution — all in one dense figure
+- **Include**: Error bars or shaded bands showing per-class std
+- **Purpose**: Show lift over zero-shot, scaling with k, KB contribution, and variance — all in one dense figure
 
-### Figure 4: Model Scaling + Zero-shot Comparison (combined dense figure)
+### Figure 5: Model Scaling + Zero-shot Comparison (combined dense figure)
 - **Type**: 1x2 panel or similar dense layout
-- **Left panel**: Model ablation (haiku/sonnet/opus) across all 3 crops — grouped bars
+- **Left panel**: Model ablation (haiku/sonnet/opus) across all 3 crops — grouped bars with std error bars
 - **Right panel**: Zero-shot vs Agent no-KB vs Agent+KB at a fixed k, all 3 crops
 - **Config**: `figsize=(11, 4)` or similar — dense, one figure showing multiple dimensions
 - **Purpose**: Two findings in one figure — model quality scaling and KB effect
 
-### Figure 5: Per-class Accuracy Heatmap
+### Figure 6: Per-class Accuracy Heatmap
 - **Type**: Heatmap for one crop (corn or soybean)
 - **Rows**: Disease classes
 - **Columns**: Zero-shot, Agent no-KB, Agent+KB
 - **Config**: `figsize=(6, 8)` or as needed
 - **Purpose**: Show where the system helps, where diseases are genuinely hard
 
-### Figure 6+: Reasoning Trace Examples (LaTeX, not matplotlib)
-- **Implementation**: Script `writing/scripts/trace_to_tex.py` converts JSON trace files → `.tex` files
-- **Output directory**: `writing/69aae430e8bdcbd9056bf911/traces/`
+### Figure 7+: Reasoning Trace Examples (LaTeX, not matplotlib)
+- **Script**: `CyberVisionAg/open_agentic/trace_to_tex.py` (code lives with the pipeline)
+- **Output directory**: `writing/69aae430e8bdcbd9056bf911/traces/` (outputs live with the paper)
 - **main.tex** uses `\input{traces/trace_example_1.tex}` — script changes go to trace files, main.tex just references them
 - **Each trace `.tex` file clearly shows**: k value, model, KB source (internet/local/none), then step-by-step reasoning (which refs viewed, visual observations, differential reasoning, final prediction, ground truth)
 - **Start small**: 1-2 traces (one correct, one incorrect)
@@ -155,8 +178,11 @@ All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PD
 ### Table 1: Dataset Summary
 - Crops, number of classes, train/test image counts, KB coverage
 
-### Table 2: Main Results
-- Full ablation: zero-shot + agent rows across k values, KB sources, all 3 crops
+### Table 2: Main Results (Appendix)
+- Full ablation: zero-shot + agent rows across k values, KB sources, models, all 3 crops
+- Auto-generated from summary JSONs via script
+- Contains all configurations for traceability — every number in the paper can be traced back here
+- Highlight best values per crop
 
 ---
 
@@ -166,19 +192,21 @@ All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PD
 - [x] Run all sweeps (soybean, corn, mango)
 - [x] Fix corn k=8 contamination
 - [x] Run zero-shot baseline for all 3 crops
-- [ ] Verify all numbers are clean and consistent (cross-check summary JSONs)
-- [ ] Commit final results
+- [x] Verify all numbers are clean and consistent (cross-check all 54 summary JSONs)
+- [x] Commit final results
 
 ### Phase 2: Generate figures
-- [ ] Create `writing/plots/generate_figures.py` (reads summary JSONs, outputs PDFs)
-- [ ] Figure 3: Accuracy vs k line plots (1x3 panel) with zero-shot floor
-- [ ] Figure 4: Model scaling + KB comparison (combined dense panel)
-- [ ] Figure 5: Per-class accuracy heatmap
+- [ ] Create `CyberVisionAg/open_agentic/generate_figures.py` (reads directly from summary JSONs + `all-crops.xlsx`)
+- [ ] Figure 3: Dataset scale + agentic flow (multi-panel: crop distribution from xlsx + system flow)
+- [ ] Figure 4: Accuracy vs k line plots (1x3 panel) with zero-shot floor + per-class std bands
+- [ ] Figure 5: Model scaling + KB comparison (combined dense panel with std error bars)
+- [ ] Figure 6: Per-class accuracy heatmap
+- [ ] All plots must read from raw data files — no hardcoded numbers
 - [ ] Save all as PDF in `writing/69aae430e8bdcbd9056bf911/figures/`
 - [ ] Review all figures for consistency with `plotting_instructions.md`
 
 ### Phase 3: Reasoning trace pipeline
-- [ ] Write `writing/scripts/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
+- [ ] Write `CyberVisionAg/open_agentic/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
 - [ ] Each `.tex` file clearly displays: config (k, model, KB source), step-by-step reasoning, prediction, ground truth
 - [ ] Output to `writing/69aae430e8bdcbd9056bf911/traces/`
 - [ ] main.tex uses `\input{traces/trace_example_1.tex}` to include
