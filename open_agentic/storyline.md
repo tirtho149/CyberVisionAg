@@ -250,8 +250,8 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [x] Section 5: Agentic Diagnostic Pipeline (3 paragraphs: inputs, reasoning process, trace/explainability)
   - **Future**: Add appendix section before traces with: (1) exact system prompt, (2) example user message structure, (3) one complete registry schema entry. All auto-generated from source files via script.
 - [x] Section 6: Experiments (setup, results with inline numbers verified against data, figures/tables/trace referenced)
-- [ ] Section 7: Discussion (still bullet points — few-shot vs agentic, limitations, cost-explainability)
-- [ ] Section 8: Conclusion (empty)
+- [x] Section 7: Discussion (3 paragraphs: main findings, few-shot comparison with appendix table, limitations)
+- [x] Section 8: Conclusion merged into Discussion
 - [ ] Abstract (write last)
 
 ### Phase 5: Literature review

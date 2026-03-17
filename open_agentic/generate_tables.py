@@ -239,6 +239,63 @@ def table_appendix_delta():
     return "\n".join(lines)
 
 
+# ── Table: Few-shot comparison (appendix) ─────────────────────────────────────
+
+def table_fewshot_comparison():
+    """Appendix table comparing few-shot baseline vs agent across k values."""
+    crops = [
+        ("Soybean_Diseases", "Soybean"),
+        ("Corn_Diseases", "Corn"),
+        ("Mango_Leaf_Disease", "Mango"),
+    ]
+    ks = [1, 4, 8, 16]
+
+    lines = []
+    lines.append(r"\begin{table*}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(r"\caption{Comparison with single-pass few-shot classification. Few-shot receives $k$ randomly sampled labeled images in a single API call with no reasoning. The agent uses deliberative multi-turn reasoning with selective reference viewing. Accuracy (\%), 3 test images per class.}")
+    lines.append(r"\label{tab:fewshot}")
+    lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
+    lines.append(r"\toprule")
+    lines.append(r"Crop & Method & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
+    lines.append(r"\midrule")
+
+    for crop_id, crop_label in crops:
+        # Few-shot results
+        fs_accs = [_load(crop_id, "few_shot", "sonnet", k) for k in ks]
+        # Agent + internet KB results
+        ag_accs = [_load(crop_id, "internet", "sonnet", k) for k in ks]
+
+        # Find best per k
+        best_per_k = {}
+        for i, k in enumerate(ks):
+            vals = [v for v in [fs_accs[i], ag_accs[i]] if v is not None]
+            best_per_k[k] = max(vals) if vals else -1
+
+        # Few-shot row
+        cells = []
+        for i, k in enumerate(ks):
+            is_best = fs_accs[i] is not None and abs(fs_accs[i] - best_per_k[k]) < 0.01
+            cells.append(_fmt(fs_accs[i], bold=is_best))
+        lines.append(f"{crop_label} & Few-shot (single-pass) & " + " & ".join(cells) + r" \\")
+
+        # Agent row
+        cells = []
+        for i, k in enumerate(ks):
+            is_best = ag_accs[i] is not None and abs(ag_accs[i] - best_per_k[k]) < 0.01
+            cells.append(_fmt(ag_accs[i], bold=is_best))
+        lines.append(f" & Agent + internet KB & " + " & ".join(cells) + r" \\")
+
+        lines.append(r"\midrule")
+
+    lines[-1] = r"\bottomrule"
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table*}")
+
+    return "\n".join(lines)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -257,7 +314,10 @@ def main():
     out.write_text(tex)
     print(f"  Model ablation → {out.name}")
 
-    # Appendix table removed — main text table with deltas covers it
+    tex = table_fewshot_comparison()
+    out = TABLES_OUT / "table_fewshot_comparison.tex"
+    out.write_text(tex)
+    print(f"  Few-shot comparison → {out.name}")
 
 
 if __name__ == "__main__":
