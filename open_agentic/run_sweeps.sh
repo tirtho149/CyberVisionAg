@@ -50,9 +50,14 @@ setup_crop() {
             EXCLUDE=""
             KB_SOURCES=("none" "internet")
             ;;
+        tomato)
+            DATASET="Tomato_Diseases"
+            EXCLUDE="Bacterial_Leaf_Spot,Leaf_Bacterial_Spot,Early_Blight_Leaf,Leaf_Late_Blight,Mold_Leaf,Leaf_Mosaic_Virus,Leaf_Yellow_Virus,Spider_Mites_Two-Spotted_Spider_Mite,Two_Spotted_Spider_Mites_Leaf,Yellow_Leaf_Curl_Virus"
+            KB_SOURCES=("none" "internet")
+            ;;
         *)
             echo "Unknown crop: ${CROP}"
-            echo "Available: soybean, corn, mango"
+            echo "Available: soybean, corn, mango, tomato"
             exit 1
             ;;
     esac
