@@ -231,7 +231,7 @@ def figure_4_accuracy_vs_k():
     fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=False)
 
     for ax, (crop, title, sources) in zip(axes, crops):
-        # Zero-shot floor
+        # Direct classif. floor
         zs_acc, zs_std = get_accuracy_and_std(crop, "few_shot", "sonnet", 0)
 
         # Track all accuracy values for dynamic y-axis
@@ -239,7 +239,7 @@ def figure_4_accuracy_vs_k():
 
         if zs_acc is not None:
             ax.axhline(y=zs_acc, color='#7f8c8d', linestyle='--', linewidth=1.2,
-                       label='Zero-shot', zorder=1)
+                       label='Direct classif.', zorder=1)
             all_accs.append(zs_acc)
 
         # Plot each method
@@ -309,7 +309,7 @@ def figure_4_accuracy_vs_k():
 # ── Figure 5: Model scaling + KB comparison ───────────────────────────────────
 
 def figure_5_model_and_kb():
-    """Combined panel: (a) model ablation, (b) zero-shot vs agent vs agent+KB."""
+    """Combined panel: (a) model ablation, (b) direct classification vs agent vs agent+KB."""
     import matplotlib.pyplot as plt
 
     plt.rcParams.update({
@@ -362,9 +362,9 @@ def figure_5_model_and_kb():
     y_max = max(all_vals) if all_vals else 100
     ax1.set_ylim(0, min(100, y_max + 12))
 
-    # ── Panel (b): Zero-shot vs Agent vs Agent+KB at k=4 ─────────────────
+    # ── Panel (b): Direct classif. vs Agent vs Agent+KB at k=4 ─────────────────
     methods = [
-        ("Zero-shot", "few_shot", "sonnet", 0, "#7f8c8d"),
+        ("Direct classif.", "few_shot", "sonnet", 0, "#7f8c8d"),
         ("Agent (no KB)", "none", "sonnet", 4, "#3498db"),
         ("Agent + KB", "internet", "sonnet", 4, "#e74c3c"),
     ]
@@ -386,7 +386,7 @@ def figure_5_model_and_kb():
     ax2.set_xticks(x)
     ax2.set_xticklabels(crop_labels)
     ax2.set_ylabel("Accuracy (%)")
-    ax2.set_title("(b) Zero-shot vs Agent vs Agent+KB (k=4)", fontweight='bold')
+    ax2.set_title("(b) Direct classif. vs Agent vs Agent+KB (k=4)", fontweight='bold')
     ax2.legend(loc='upper left')
     ax2.grid(axis='y', linestyle='--', alpha=0.4)
 

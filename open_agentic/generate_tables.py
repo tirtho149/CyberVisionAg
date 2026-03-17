@@ -67,7 +67,7 @@ def _fmt_delta(acc, baseline, bold=False):
 # ── Table 2: Main results (method × k, sonnet) ───────────────────────────────
 
 def table_main_results():
-    """Compact table: zero-shot + agent methods, accuracy % only."""
+    """Compact table: direct classification + agent methods, accuracy % only."""
     crops = [
         ("Soybean_Diseases", "Soybean (27)", ["none", "local", "internet"]),
         ("Corn_Diseases", "Corn (24)", ["none", "internet"]),
@@ -84,7 +84,7 @@ def table_main_results():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. Values show accuracy\,\% with improvement over zero-shot in parentheses. Best per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. Values show accuracy\,\% with improvement over direct classification in parentheses. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:main_results}")
     lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
@@ -105,11 +105,11 @@ def table_main_results():
             vals = [all_results[m][k] for m in all_results if all_results[m][k] is not None]
             best_per_k[k] = max(vals) if vals else -1
 
-        # Zero-shot row
+        # Direct classif. row
         zs_str = _fmt(zs)
-        lines.append(f"{crop_label} & Zero-shot & " + " & ".join([zs_str] * len(ks)) + r" \\")
+        lines.append(f"{crop_label} & Direct classif. & " + " & ".join([zs_str] * len(ks)) + r" \\")
 
-        # Agent rows with delta from zero-shot
+        # Agent rows with delta from direct classification
         for source in sources:
             label = method_labels[source]
             cells = []
@@ -171,10 +171,10 @@ def table_model_ablation():
     return "\n".join(lines)
 
 
-# ── Table A1 (Appendix): Delta from zero-shot ────────────────────────────────
+# ── Table A1 (Appendix): Delta from direct classification ────────────────────────────────
 
 def table_appendix_delta():
-    """Appendix table showing improvement over zero-shot for every config."""
+    """Appendix table showing improvement over direct classification for every config."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
@@ -195,14 +195,14 @@ def table_appendix_delta():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Improvement over zero-shot baseline (percentage points) across all configurations. 3 test images per class. Best improvement per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\caption{Improvement over direct classification baseline (percentage points) across all configurations. 3 test images per class. Best improvement per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:delta_results}")
 
     for crop_id, crop_label in crops:
         zs = _load(crop_id, "few_shot", "sonnet", 0)
 
         lines.append(f"\\vspace{{4pt}}")
-        lines.append(f"\\textbf{{{crop_label}}} (zero-shot: {_fmt(zs)})\\\\[2pt]")
+        lines.append(f"\\textbf{{{crop_label}}} (direct classification: {_fmt(zs)})\\\\[2pt]")
         lines.append(r"\begin{tabular}{l" + "r" * len(ks) + "}")
         lines.append(r"\toprule")
         lines.append(r"Configuration & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
