@@ -133,8 +133,9 @@ def trace_to_tex(
     \end{{minipage}}%
     \hfill
     \begin{{minipage}}[t]{{0.30\linewidth}}
-    \raggedleft
-    {img_tex}
+    \centering
+    \fbox{{{img_tex}}}\\[2pt]
+    {{\scriptsize \textit{{Test image}}}}
     \end{{minipage}}
 
     \vspace{{4pt}}
