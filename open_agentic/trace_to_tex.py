@@ -115,7 +115,7 @@ def trace_to_tex(
 
     tex = textwrap.dedent(rf"""
     \begin{{tcolorbox}}[
-        colback=gray!3, colframe=gray!50, boxrule=0.5pt,
+        breakable, colback=gray!3, colframe=gray!50, boxrule=0.5pt,
         title={{\small \textbf{{Reasoning Trace:}} {_escape_latex(crop_display)} — {image_display}}},
         fonttitle=\small,
     ]

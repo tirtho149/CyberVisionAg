@@ -203,11 +203,11 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 ### Table 1: Dataset Summary
 - Crops, number of classes, train/test image counts, KB coverage
 
-### Table 2: Main Results (Appendix)
-- Full ablation: zero-shot + agent rows across k values, KB sources, models, all 3 crops
-- Auto-generated from summary JSONs via script
-- Contains all configurations for traceability — every number in the paper can be traced back here
-- Highlight best values per crop
+### Table 2: Main Results (in-text, only table)
+- Method × k with accuracy % and delta from zero-shot
+- Auto-generated via `generate_tables.py` from summary JSONs
+- Bold best per crop-k, caption notes 3 images/class
+- Model ablation shown in Figure 5 (no separate table needed)
 
 ---
 
@@ -240,27 +240,27 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [ ] Expand later: more crops, KB sources, k values, models as needed
 
 ### Phase 4: Write the paper (in main.tex)
-- [ ] Update Section 1: Introduction (align with storyline)
-- [ ] Section 3: Dataset (image sources, evaluation crops, schema)
-- [ ] Section 4: Disease Registry Pipeline (inspect `disease_registry/` code in detail, expand existing content)
-- [ ] Section 5: Agentic Diagnostic Pipeline (architecture, prompt design, reasoning structure)
-- [ ] Section 6: Experiments (setup, results with figures/tables, qualitative trace analysis)
-- [ ] Section 7: Discussion (few-shot vs agentic paradigm, limitations, cost-explainability tradeoff)
-- [ ] Section 8: Conclusion
-- [ ] Abstract (write last, after all sections are complete)
+- [x] Section 1: Introduction (data-first framing, four contributions, citations grounded)
+- [x] Section 2: Related Work (flowing prose, no subsections — datasets, VLMs, CoT/agentic)
+- [x] Section 3.1: Dataset — Image Sources (four source categories with citations)
+- [ ] Section 3.2: Dataset — Splits (still bullet points)
+- [ ] Section 3.3: Dataset — Registry Schema (table exists, needs prose)
+- [x] Section 4: Disease Registry Pipeline (source-first principle, three stages in flowing prose)
+  - **Future note**: Reconciliation prompt includes 6-tier source authority ranking (NCBI > APS > CABI > peer-reviewed > extension > industry). Confirmed in `prompts/reconciliation.py:15-22`. Could be mentioned in a revision if reviewers ask about conflict resolution.
+- [x] Section 5: Agentic Diagnostic Pipeline (3 paragraphs: inputs, reasoning process, trace/explainability)
+  - **Future**: Add appendix section before traces with: (1) exact system prompt, (2) example user message structure, (3) one complete registry schema entry. All auto-generated from source files via script.
+- [x] Section 6: Experiments (setup, results with inline numbers verified against data, figures/tables/trace referenced)
+- [ ] Section 7: Discussion (still bullet points — few-shot vs agentic, limitations, cost-explainability)
+- [ ] Section 8: Conclusion (empty)
+- [ ] Abstract (write last)
 
 ### Phase 5: Literature review
-- [ ] Receive abstracts and references.bib files from user
-- [ ] Organize references into categories:
-  - Plant disease classification (CNN/ViT)
-  - Few-shot learning in agriculture
-  - VLMs for visual reasoning
-  - Agentic AI / tool-use systems
-  - Explainability in agricultural AI
-  - Disease knowledge bases
-- [ ] Write Section 2: Related Work from provided references
-- [ ] Iterate with user on coverage and framing
-- [ ] Ensure all claims in intro/discussion are supported by citations
+- [x] Receive abstracts and references.bib files from user
+- [x] Added 20+ references: 6 published papers, 14 Kaggle datasets, 6 additional papers (ChatLeafDisease, PDD-AGENT, CDDM, WDLM, AgroGPT, Agri-LLaVA, AgReason, AgEval)
+- [x] All bib entries verified (URLs, authors, titles) via parallel agents + WebFetch
+- [x] Write Section 2: Related Work from provided references
+- [x] References integrated naturally into Introduction and Related Work
+- [ ] Iterate with user on coverage and framing (ongoing)
 
 ### Phase 6: Polish
 - [ ] Cross-check all numbers: text vs figures vs tables vs summary JSONs
