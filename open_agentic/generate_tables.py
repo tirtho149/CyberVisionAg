@@ -15,23 +15,36 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = SCRIPT_DIR.parent / "results" / "open_agentic"
 TABLES_OUT = Path(__file__).resolve().parents[2] / "writing" / "69aae430e8bdcbd9056bf911" / "tables"
 
+# Configs to exclude from tables (experimental/visual KB artifacts)
+EXCLUDE_SOURCES = {"Corn_Diseases"}  # the doubled-path visual KB result
+
 
 def _load(crop, source, model, k):
-    """Load accuracy from a summary.json. Returns (correct, total, accuracy) or None."""
+    """Load accuracy from a summary.json. Returns accuracy % or None."""
     path = RESULTS_DIR / crop / source / model / f"k{k}" / "summary.json"
     if not path.exists():
         return None
     d = json.loads(path.read_text())
-    m = d["metrics"]
-    return m["correct"], m["total"], m["accuracy"]
+    return d["metrics"]["accuracy"]
 
 
-def _fmt(result, bold=False):
-    """Format a result as 'correct/total (acc%)' or '—'."""
-    if result is None:
+def _fmt(acc, bold=False):
+    """Format accuracy as 'X.Y%' or '—'."""
+    if acc is None:
         return "—"
-    correct, total, acc = result
-    s = f"{correct}/{total} ({acc:.1f}\\%)"
+    s = f"{acc:.1f}\\%"
+    if bold:
+        s = f"\\textbf{{{s}}}"
+    return s
+
+
+def _fmt_delta(acc, baseline, bold=False):
+    """Format as delta from baseline: '+X.Y' or '—'."""
+    if acc is None or baseline is None:
+        return "—"
+    delta = acc - baseline
+    sign = "+" if delta >= 0 else ""
+    s = f"{sign}{delta:.1f}"
     if bold:
         s = f"\\textbf{{{s}}}"
     return s
@@ -40,7 +53,7 @@ def _fmt(result, bold=False):
 # ── Table 2: Main results (method × k, sonnet) ───────────────────────────────
 
 def table_main_results():
-    """Compact table: zero-shot + agent methods across k values, per crop."""
+    """Compact table: zero-shot + agent methods, accuracy % only."""
     crops = [
         ("Soybean_Diseases", "Soybean (27)", ["none", "local", "internet"]),
         ("Corn_Diseases", "Corn (24)", ["none", "internet"]),
@@ -57,7 +70,7 @@ def table_main_results():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model). Zero-shot uses no reference images. Best result per crop--$k$ combination is in \textbf{bold}.}")
+    lines.append(r"\caption{Diagnostic accuracy (\%) across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Zero-shot uses no reference images. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:main_results}")
     lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
@@ -65,24 +78,36 @@ def table_main_results():
     lines.append(r"\midrule")
 
     for crop_id, crop_label, sources in crops:
-        # Zero-shot row
+        # Collect all results for this crop to find best per k
+        all_methods = {}
         zs = _load(crop_id, "few_shot", "sonnet", 0)
-        zs_str = _fmt(zs) if zs else "—"
+        all_methods["Zero-shot"] = {k: zs for k in ks}
+        for source in sources:
+            label = method_labels[source]
+            all_methods[label] = {k: _load(crop_id, source, "sonnet", k) for k in ks}
+
+        # Find best per k
+        best_per_k = {}
+        for k in ks:
+            vals = [all_methods[m][k] for m in all_methods if all_methods[m][k] is not None]
+            best_per_k[k] = max(vals) if vals else -1
+
+        # Zero-shot row (same value across all k)
+        zs_str = _fmt(zs)
         lines.append(f"{crop_label} & Zero-shot & " + " & ".join([zs_str] * len(ks)) + r" \\")
 
         # Agent rows
         for source in sources:
             label = method_labels[source]
-            results = [_load(crop_id, source, "sonnet", k) for k in ks]
-
-            # Find best per k across methods for this crop
-            # (we'll do bolding after collecting all methods)
-            row = f" & {label} & " + " & ".join(_fmt(r) for r in results) + r" \\"
-            lines.append(row)
+            cells = []
+            for k in ks:
+                acc = all_methods[label][k]
+                is_best = acc is not None and abs(acc - best_per_k[k]) < 0.01
+                cells.append(_fmt(acc, bold=is_best))
+            lines.append(f" & {label} & " + " & ".join(cells) + r" \\")
 
         lines.append(r"\midrule")
 
-    # Remove last \midrule and replace with \bottomrule
     lines[-1] = r"\bottomrule"
     lines.append(r"\end{tabular}")
     lines.append(r"\end{table*}")
@@ -93,7 +118,7 @@ def table_main_results():
 # ── Table 3: Model ablation ──────────────────────────────────────────────────
 
 def table_model_ablation():
-    """Model ablation table: haiku/sonnet/opus at internet KB, k=8."""
+    """Model ablation: haiku/sonnet/opus at internet KB, k=8."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
@@ -101,11 +126,17 @@ def table_model_ablation():
     ]
     models = [("haiku", "Haiku"), ("sonnet", "Sonnet"), ("opus", "Opus")]
 
+    # Find best per crop for bolding
+    best_per_crop = {}
+    for crop_id, _ in crops:
+        vals = [_load(crop_id, "internet", m, 8) for m, _ in models]
+        best_per_crop[crop_id] = max(v for v in vals if v is not None)
+
     lines = []
     lines.append(r"\begin{table}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Model scaling: accuracy with internet KB at $k=8$.}")
+    lines.append(r"\caption{Model scaling: accuracy (\%) with internet KB at $k=8$, 3 test images per class. Best per crop in \textbf{bold}.}")
     lines.append(r"\label{tab:model_ablation}")
     lines.append(r"\begin{tabular}{l" + "r" * len(crops) + "}")
     lines.append(r"\toprule")
@@ -113,9 +144,12 @@ def table_model_ablation():
     lines.append(r"\midrule")
 
     for model_id, model_label in models:
-        results = [_load(crop_id, "internet", model_id, 8) for crop_id, _ in crops]
-        row = f"{model_label} & " + " & ".join(_fmt(r) for r in results) + r" \\"
-        lines.append(row)
+        cells = []
+        for crop_id, _ in crops:
+            acc = _load(crop_id, "internet", model_id, 8)
+            is_best = acc is not None and abs(acc - best_per_crop[crop_id]) < 0.01
+            cells.append(_fmt(acc, bold=is_best))
+        lines.append(f"{model_label} & " + " & ".join(cells) + r" \\")
 
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
@@ -124,75 +158,63 @@ def table_model_ablation():
     return "\n".join(lines)
 
 
-# ── Table A1 (Appendix): Full results ─────────────────────────────────────────
+# ── Table A1 (Appendix): Delta from zero-shot ────────────────────────────────
 
-def table_appendix_full():
-    """Complete results table with every configuration."""
+def table_appendix_delta():
+    """Appendix table showing improvement over zero-shot for every config."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
     ]
-    ks = [0, 1, 4, 8, 16]
+    ks = [1, 4, 8, 16]
 
-    # Collect all (source, model) combos that exist
-    configs = []
-    for crop_id, _ in crops:
-        for source_dir in sorted((RESULTS_DIR / crop_id).iterdir()):
-            if not source_dir.is_dir():
-                continue
-            source = source_dir.name
-            for model_dir in sorted(source_dir.iterdir()):
-                if not model_dir.is_dir():
-                    continue
-                model = model_dir.name
-                key = (source, model)
-                if key not in configs:
-                    configs.append(key)
-
-    # Sort configs logically
-    source_order = {"few_shot": 0, "none": 1, "local": 2, "internet": 3}
-    model_order = {"haiku": 0, "sonnet": 1, "opus": 2}
-    configs.sort(key=lambda x: (source_order.get(x[0], 9), model_order.get(x[1], 9)))
-
-    def _config_label(source, model):
-        if source == "few_shot":
-            return f"Few-shot ({model})"
-        source_label = {"none": "no KB", "local": "local KB", "internet": "internet KB"}.get(source, source)
-        return f"Agent + {source_label} ({model})"
+    # Define the configs to show (skip few_shot k>0 and experimental ones)
+    agent_configs = [
+        ("none", "sonnet", "Agent, no KB (Sonnet)"),
+        ("local", "sonnet", "Agent + local KB (Sonnet)"),
+        ("internet", "sonnet", "Agent + internet KB (Sonnet)"),
+        ("internet", "haiku", "Agent + internet KB (Haiku)"),
+        ("internet", "opus", "Agent + internet KB (Opus)"),
+    ]
 
     lines = []
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
-    lines.append(r"\footnotesize")
-    lines.append(r"\caption{Complete results across all configurations. $k=0$ denotes zero-shot (no reference images).}")
-    lines.append(r"\label{tab:full_results}")
+    lines.append(r"\small")
+    lines.append(r"\caption{Improvement over zero-shot baseline (percentage points) across all configurations. 3 test images per class. Best improvement per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\label{tab:delta_results}")
 
     for crop_id, crop_label in crops:
+        zs = _load(crop_id, "few_shot", "sonnet", 0)
+
         lines.append(f"\\vspace{{4pt}}")
-        lines.append(f"\\textbf{{{crop_label}}}\\\\[2pt]")
+        lines.append(f"\\textbf{{{crop_label}}} (zero-shot: {_fmt(zs)})\\\\[2pt]")
         lines.append(r"\begin{tabular}{l" + "r" * len(ks) + "}")
         lines.append(r"\toprule")
         lines.append(r"Configuration & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
         lines.append(r"\midrule")
 
-        # Find best accuracy per k for bolding
-        best_per_k = {}
+        # Find best delta per k
+        best_delta = {}
         for k in ks:
-            best_acc = -1
-            for source, model in configs:
-                r = _load(crop_id, source, model, k)
-                if r and r[2] > best_acc:
-                    best_acc = r[2]
-            best_per_k[k] = best_acc
+            deltas = []
+            for source, model, _ in agent_configs:
+                acc = _load(crop_id, source, model, k)
+                if acc is not None and zs is not None:
+                    deltas.append(acc - zs)
+            best_delta[k] = max(deltas) if deltas else -999
 
-        for source, model in configs:
-            label = _config_label(source, model)
+        for source, model, label in agent_configs:
             cells = []
             for k in ks:
-                r = _load(crop_id, source, model, k)
-                is_best = r is not None and abs(r[2] - best_per_k[k]) < 0.01
-                cells.append(_fmt(r, bold=is_best))
+                acc = _load(crop_id, source, model, k)
+                if acc is not None and zs is not None:
+                    delta = acc - zs
+                    is_best = abs(delta - best_delta[k]) < 0.01
+                    cells.append(_fmt_delta(acc, zs, bold=is_best))
+                else:
+                    cells.append("—")
             lines.append(f"{label} & " + " & ".join(cells) + r" \\")
 
         lines.append(r"\bottomrule")
@@ -212,23 +234,20 @@ def main():
     print(f"  Output: {TABLES_OUT}")
     print()
 
-    # Table 2: Main results
     tex = table_main_results()
     out = TABLES_OUT / "table_main_results.tex"
     out.write_text(tex)
-    print(f"  Main results table → {out.name}")
+    print(f"  Main results → {out.name}")
 
-    # Table 3: Model ablation
     tex = table_model_ablation()
     out = TABLES_OUT / "table_model_ablation.tex"
     out.write_text(tex)
-    print(f"  Model ablation table → {out.name}")
+    print(f"  Model ablation → {out.name}")
 
-    # Table A1: Full appendix
-    tex = table_appendix_full()
+    tex = table_appendix_delta()
     out = TABLES_OUT / "table_appendix_full.tex"
     out.write_text(tex)
-    print(f"  Full appendix table → {out.name}")
+    print(f"  Appendix delta → {out.name}")
 
 
 if __name__ == "__main__":
