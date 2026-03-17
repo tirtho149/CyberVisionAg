@@ -125,6 +125,28 @@ All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PD
 - Merge long tails into "+N more" entries to avoid visual noise.
 - Always export at high resolution for publication quality.
 
+**Artifact regeneration commands** (run from `AgCrawler/` root):
+```bash
+# Activate environment
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+
+# Regenerate all figures (outputs to writing/.../figures/)
+python -m CyberVisionAg.open_agentic.generate_figures
+
+# Regenerate all traces (outputs to writing/.../traces/)
+python -m CyberVisionAg.open_agentic.trace_to_tex
+
+# Recompile paper
+cd writing/69aae430e8bdcbd9056bf911 && pdflatex -interaction=nonstopmode main.tex
+
+# Print results tables
+cd CyberVisionAg && bash open_agentic/run_sweeps.sh results soybean
+bash open_agentic/run_sweeps.sh results corn
+bash open_agentic/run_sweeps.sh results mango
+```
+Every generated artifact (figures, traces, tables) has a single command that reproduces it from raw data. If experiments are rerun or data changes, only the relevant command needs to be re-executed.
+
 ### Figure 1: System Overview (already in main.tex as `fig:overview`)
 - Block diagram: Crop name → Registry pipeline → Disease Registry → Agent + Images → Prediction
 - Already implemented in TikZ
@@ -209,9 +231,9 @@ All figures follow `plotting_instructions.md` (Arial font, rcParams, dpi=300, PD
 - [ ] Write `CyberVisionAg/open_agentic/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
 - [ ] Each `.tex` file clearly displays: config (k, model, KB source), step-by-step reasoning, prediction, ground truth
 - [ ] Output to `writing/69aae430e8bdcbd9056bf911/traces/`
-- [ ] main.tex uses `\input{traces/trace_example_1.tex}` to include
+- [ ] main.tex uses `\input{traces/trace_example_1.tex}` to include (maybe for lower value of k since it'll be in text)
 - [ ] Start with 2 traces: one correct, one incorrect
-- [ ] Expand later: multiple crops, KB sources, k values, models — systematically organized
+- [ ] Expand later: multiple crops, KB sources, k values, models — systematically organized. These will be all in the appendix.
 
 ### Phase 4: Write the paper (in main.tex)
 - [ ] Update Section 1: Introduction (align with storyline)
