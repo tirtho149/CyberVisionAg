@@ -83,7 +83,7 @@ RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 # Build configs dynamically based on crop's KB sources
 AGENTIC_CONFIGS=()
 for src in "${KB_SOURCES[@]}"; do
-    for k in 1 4 8 16; do
+    for k in 0 1 4 8 16; do
         AGENTIC_CONFIGS+=("sonnet,${src},${k}")
     done
 done
@@ -92,7 +92,7 @@ AGENTIC_CONFIGS+=("haiku,internet,8")
 AGENTIC_CONFIGS+=("opus,internet,8")
 # Deduplicate (sonnet,internet,8 already exists from the loop)
 
-FEWSHOT_K_VALUES=(1 4 8 16)
+FEWSHOT_K_VALUES=(0 1 4 8 16)
 
 # ── Helper functions ──────────────────────────────────────────────────────────
 run_single() {
@@ -201,24 +201,26 @@ fi
 if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
     echo "=== Table 1: Method × k — ${DATASET} (sonnet) ==="
     echo ""
-    printf "%-20s | %15s | %15s | %15s | %15s\n" "Method" "k=1" "k=4" "k=8" "k=16"
-    printf "%-20s-|-%15s-|-%15s-|-%15s-|-%15s\n" "--------------------" "---------------" "---------------" "---------------" "---------------"
+    printf "%-20s | %15s | %15s | %15s | %15s | %15s\n" "Method" "k=0" "k=1" "k=4" "k=8" "k=16"
+    printf "%-20s-|-%15s-|-%15s-|-%15s-|-%15s-|-%15s\n" "--------------------" "---------------" "---------------" "---------------" "---------------" "---------------"
     # Few-shot
+    fr0=$(read_accuracy sonnet "few_shot" 0)
     fr1=$(read_accuracy sonnet "few_shot" 1)
     fr4=$(read_accuracy sonnet "few_shot" 4)
     fr8=$(read_accuracy sonnet "few_shot" 8)
     fr16=$(read_accuracy sonnet "few_shot" 16)
-    printf "%-20s | %15s | %15s | %15s | %15s\n" "Few-shot baseline" "${fr1}" "${fr4}" "${fr8}" "${fr16}"
+    printf "%-20s | %15s | %15s | %15s | %15s | %15s\n" "Few-shot baseline" "${fr0}" "${fr1}" "${fr4}" "${fr8}" "${fr16}"
     # Agentic by KB source
     for src in "${KB_SOURCES[@]}"; do
         label="Agent (no KB)"
         [ "${src}" = "local" ] && label="Agent + local KB"
         [ "${src}" = "internet" ] && label="Agent + internet KB"
+        r0=$(read_accuracy sonnet "${src}" 0)
         r1=$(read_accuracy sonnet "${src}" 1)
         r4=$(read_accuracy sonnet "${src}" 4)
         r8=$(read_accuracy sonnet "${src}" 8)
         r16=$(read_accuracy sonnet "${src}" 16)
-        printf "%-20s | %15s | %15s | %15s | %15s\n" "${label}" "${r1}" "${r4}" "${r8}" "${r16}"
+        printf "%-20s | %15s | %15s | %15s | %15s | %15s\n" "${label}" "${r0}" "${r1}" "${r4}" "${r8}" "${r16}"
     done
     echo ""
 

@@ -70,7 +70,7 @@ def build_user_message(
 
     # Reference images
     if k is not None:
-        min_refs = max(1, int(k * 0.8))  # must use ~80% of budget
+        min_refs = max(0, int(k * 0.8))  # must use ~80% of budget
         budget_note = (
             f"Budget: at most **{k}** views. "
             f"You MUST view at least **{min_refs}** reference images before submitting."

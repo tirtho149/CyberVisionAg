@@ -699,7 +699,7 @@ def main():
         kb_label = args.symptom_source
 
     # Setup logging — dir includes crop/kb/model/k so configs don't clobber
-    k_label = f"k{args.k}" if args.k else "kunlimited"
+    k_label = f"k{args.k}" if args.k is not None else "kunlimited"
     if args.confusion_guide:
         k_label += "_cg"  # distinguish confusion-guide runs
     log_dir = RESULTS_DIR / args.dataset / kb_label / _ACTIVE_MODEL / k_label

@@ -262,6 +262,12 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [x] References integrated naturally into Introduction and Related Work
 - [ ] Iterate with user on coverage and framing (ongoing)
 
+### Phase 5b: Attractor guide results subsection
+- [ ] Add subsection in Results (Section 6): attractor-based self-correction
+- [ ] Baseline vs attractor guide table (3 crops, numbers from script)
+- [ ] Confusion matrix heatmaps before/after
+- [ ] Mention in Discussion as agentic self-improvement
+
 ### Phase 6: Polish
 - [ ] Cross-check all numbers: text vs figures vs tables vs summary JSONs
 - [ ] Ensure figure/table references in text are correct
