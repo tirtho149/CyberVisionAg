@@ -1056,7 +1056,244 @@ The agent provides full reasoning traces (which references it compared, what vis
 - Collage tile size depends on smallest image in each class — corn may have smaller collages than soybean (272px vs 400px tiles).
 - Soybean has 6/27 classes with no internet KB data (22% blind), corn only 2/31 (6%) — this likely explains why KB helps corn but not soybean.
 
+### Important: Results preservation
+- **Original results** (pre-March 17 2026) are saved in `CyberVisionAg/results-mar16/`. Do NOT modify that folder.
+- New experimental results go into `CyberVisionAg/results/open_agentic/` (or `open_agentic_dev/` for dev runs).
+
+## Experiment: Confusion Guide (March 17 2026)
+
+### Hypothesis
+The agent makes systematic confusion errors between visually similar diseases. A "confusion guide" -- a separate file listing common lookalike pairs -- can make the agent aware of these pitfalls and improve accuracy.
+
+### Confusion Analysis (from agent results, Soybean k=8)
+
+Data source: agent results from `none/sonnet/k8` and `internet/sonnet/k8` (162 total predictions, 81 per config).
+
+**Top confusion pairs (bidirectional, agent only):**
+| Pair | Confusions |
+|------|-----------|
+| Phytophthora <-> Rhizoctonia | 5x |
+| Bacterial_Blight <-> Bacterial_Pustule | 4x |
+| Brown_Stem_Rot <-> Sudden_death_syndrome | 4x |
+| Phomopsis <-> White_Mold | 4x |
+| Phyllosticta_leaf_spot <-> Soybean_Vein_necrosis_virus | 4x |
+| Septoria_brown_spot <-> various (Cercospora, SDMV, Bacterial_Pustule) | 8x total |
+
+**"Attractor" classes (wrongly predicted most often, across all configs):**
+| Class | Times wrongly predicted |
+|-------|----------------------|
+| Sudden_death_syndrome | 25x |
+| Septoria_brown_spot | 18x |
+| Bacterial_Blight | 14x |
+| Bacterial_Pustule | 11x |
+| White_Mold | 10x |
+
+**Per-class accuracy comparison (all 0% classes):**
+
+6 classes score 0% across all three methods (agent no-KB, agent internet-KB, few-shot):
+- Brown_Stem_Rot, Cercospora, Soybean_Dwarf_Mosaic_Virus, Soybean_Vein_necrosis_virus, Tobacco_Streak_Virus, (Soybean_rust at 0-33%)
+
+These appear to be genuinely hard classes where visual features overlap heavily with other diseases.
+
+### Design
+
+1. **`build_confusion_guide.py`**: Script that reads eval result JSONs, builds confusion matrix, and generates a per-disease lookalike markdown file.
+2. **The guide is a separate file** the agent reads via the Read tool (not baked into the prompt). This makes it visible in traces -- you can see "agent read the confusion guide" and what it found.
+3. **`--confusion-guide` flag** in eval.py passes the guide path to the agent prompt. Results saved with `_cg` suffix in the log directory.
+4. The system prompt includes a required step: "If a Confusion Guide file is provided, you MUST read it before submitting."
+
+### Files
+- `build_confusion_guide.py` -- generates the guide from eval results
+- `confusion_guides/Soybean_Diseases.md` -- generated guide for Soybean (from agent-only results)
+
+### Run commands
+```bash
+# Generate the confusion guide (from agent results only)
+python -m CyberVisionAg.open_agentic.build_confusion_guide \
+  --results-dirs \
+    CyberVisionAg/results-mar16/open_agentic/Soybean_Diseases/none/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Soybean_Diseases/internet/sonnet/k8 \
+  --output CyberVisionAg/open_agentic/confusion_guides/Soybean_Diseases.md
+
+# Eval with confusion guide
+EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE" \
+  --confusion-guide CyberVisionAg/open_agentic/confusion_guides/Soybean_Diseases.md
+```
+
+### Experiment v1: Symmetric confusion guide (FAILED)
+
+Config: Soybean 32 classes, 96 images (3 per class), k=8, sonnet, internet KB, seed=42.
+
+| Config | Accuracy | Avg Cost | Avg Refs Viewed |
+|--------|----------|----------|-----------------|
+| Baseline (internet KB) | **38.5%** (37/96) | $0.148 | 7.0 |
+| + Symmetric Guide | **30.2%** (29/96) | $0.173 | 6.0 |
+
+**Verdict: HURT accuracy (-8.3pp).** The symmetric guide ("X is confused with Y") made the agent second-guess correct predictions. Reading the guide early (before forming candidates) primed the agent with doubt. Refs viewed dropped because the guide consumed a read slot.
+
+**Root cause**: Two problems. (1) Guide was read at step 1 (priming bias), not after forming a prediction. (2) Symmetric framing ("A and B are confused") doesn't tell the agent which direction the error goes.
+
+### Experiment v2: Asymmetric attractor guide (WORKS)
+
+Key changes from v1:
+- **Asymmetric framing**: guide is keyed by predicted class, says "when agents predicted X, the actual class was usually Y(4x), Z(3x)..."
+- **Late timing**: system prompt says "form your prediction first (steps 1-4), THEN read the guide (step 5)"
+- **Only attractor classes listed**: classes that are rarely over-predicted don't appear
+
+Config: Soybean 27 classes (5 excluded), 81 images, k=8, internet KB, seed=42.
+
+| Model | Baseline | + Attractor Guide | Delta |
+|-------|----------|-------------------|-------|
+| Haiku | 25.9% (21/81) | 19.8% (16/81) | **-6.1pp** (guide hurts) |
+| Sonnet | 35.8% (29/81) | 38.3% (31/81) | **+2.5pp** |
+| Opus | 46.9% (38/81) | **53.1%** (43/81) | **+6.2pp** |
+
+**Key finding: the attractor guide scales with model capability.** Haiku can't handle the extra reasoning. Sonnet gets marginal benefit. Opus genuinely leverages it -- reads the guide, reconsiders, and flips wrong predictions to correct ones.
+
+**Cost comparison (per image):**
+
+| Model | Baseline | + AG |
+|-------|----------|------|
+| Haiku | $0.054 | $0.065 |
+| Sonnet | $0.145 | $0.168 |
+| Opus | $0.193 | $0.238 |
+
+### Trace analysis findings
+
+From reading individual traces (Sonnet + AG run):
+- **65% of traces** (53/81): agent viewed additional collage images after reading the guide
+- **35%** (28/81): read the guide but didn't view more images
+- **100% of post-guide reads** were collage images (correct temp dir)
+- All collage reads pointed to valid class directories (verified)
+
+Detailed breakdown of post-guide behavior:
+- Viewed alternatives + got it RIGHT: 18 cases
+- Viewed alternatives + got it WRONG: 35 cases
+- No extra views + got it RIGHT: 13 cases
+- No extra views + got it WRONG: 15 cases
+
+Of the 35 wrong+viewed-alternatives cases:
+- 10 viewed the correct class's collage after guide -- still got it wrong (visual discrimination limit)
+- 20 had seen the correct class before the guide and rejected it (can't override prior visual judgment)
+- 5 never saw the correct class at all
+
+**Example of guide working (Anthracnose_test_001):**
+Agent initially predicted Diaporthe. Guide said "Diaporthe is over-predicted, actual class was Anthracnose 3/3 times." Agent re-examined, flipped to Anthracnose. Correct.
+
+**Example of guide failing (SVN_test_003):**
+Agent predicted Phyllosticta_leaf_spot. Guide said "Phyllosticta is over-predicted, actual was SVN 4/4 times." Agent viewed SVN collage but SVN collage showed different presentation than test image. Stayed with Phyllosticta. Wrong, but the visual evidence genuinely didn't match.
+
+### Confusion matrices
+- `confusion_matrix_sonnet_baseline.png` -- Sonnet baseline heatmap
+- `confusion_matrix_sonnet_attractor.png` -- Sonnet + AG heatmap
+- `confusion_matrix_opus_baseline.png` -- Opus baseline heatmap
+- `confusion_matrix_opus_attractor.png` -- Opus + AG heatmap
+- Generated by: `python -m CyberVisionAg.open_agentic.plot_confusion_matrix --results-dir <dir> --output <file> --title <title>`
+
+### Attractor guide data source
+
+**v1 guide**: 162 predictions (2 Sonnet k=8 runs from results-mar16). Used for initial Opus result (53.1%).
+
+**v2 guide (current)**: 405 predictions (all 5 baseline runs: Haiku/Sonnet/Opus x none/internet). 24 attractor classes (up from 13). More data = more reliable patterns.
+
+Both use test-based predictions -- fine for finding the accuracy ceiling. For paper defensibility, will need to build from training data only (cross-val).
+
+### Existing baselines (Opus, internet KB, k=8)
+
+| Crop | Classes | Images | Opus Baseline |
+|------|---------|--------|---------------|
+| Soybean_Diseases | 27 | 81 | 46.9% |
+| Corn_Diseases | 31 | 93 | 61.3% |
+| Mango_Leaf_Disease | 7 | 21 | 85.7% |
+
+### Experiment plan: Attractor guide across crops
+
+**Fixed config**: Opus, internet KB, k=8, seed=42, parallel=12.
+**Variable**: baseline vs attractor guide.
+**Test one thing**: does the attractor guide improve Opus accuracy? Repeated across 3 crops.
+
+For each crop:
+1. Build attractor guide from that crop's baseline results
+2. Run Opus + attractor guide
+3. Compare against existing Opus baseline
+
+### Run commands
+
+```bash
+# IMPORTANT: run from AgCrawler/ root
+cd /Users/muhammadarbabarshad/build2026-local/AgCrawler
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+
+# === SOYBEAN ===
+EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
+
+# Step 1: Build attractor guide from all Soybean baseline runs
+python -m CyberVisionAg.open_agentic.build_confusion_guide \
+  --results-dirs \
+    CyberVisionAg/results-mar16/open_agentic/Soybean_Diseases/none/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Soybean_Diseases/internet/sonnet/k8 \
+    CyberVisionAg/results/open_agentic/Soybean_Diseases/internet/sonnet/k8 \
+    CyberVisionAg/results/open_agentic/Soybean_Diseases/internet/haiku/k8 \
+    CyberVisionAg/results/open_agentic/Soybean_Diseases/internet/opus/k8 \
+  --output CyberVisionAg/open_agentic/confusion_guides/Soybean_Diseases.md
+
+# Step 2: Run Opus + attractor guide
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+  --model opus --exclude "$EXCLUDE" \
+  --confusion-guide CyberVisionAg/open_agentic/confusion_guides/Soybean_Diseases.md
+
+# === CORN ===
+# Step 1: Build attractor guide from Corn baseline runs
+python -m CyberVisionAg.open_agentic.build_confusion_guide \
+  --results-dirs \
+    CyberVisionAg/results-mar16/open_agentic/Corn_Diseases/none/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Corn_Diseases/internet/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Corn_Diseases/internet/opus/k8 \
+  --output CyberVisionAg/open_agentic/confusion_guides/Corn_Diseases.md
+
+# Step 2: Run Opus + attractor guide
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --dataset Corn_Diseases \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+  --model opus \
+  --confusion-guide CyberVisionAg/open_agentic/confusion_guides/Corn_Diseases.md
+
+# === MANGO ===
+# Step 1: Build attractor guide from Mango baseline runs
+python -m CyberVisionAg.open_agentic.build_confusion_guide \
+  --results-dirs \
+    CyberVisionAg/results-mar16/open_agentic/Mango_Leaf_Disease/none/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Mango_Leaf_Disease/internet/sonnet/k8 \
+    CyberVisionAg/results-mar16/open_agentic/Mango_Leaf_Disease/internet/opus/k8 \
+  --output CyberVisionAg/open_agentic/confusion_guides/Mango_Leaf_Disease.md
+
+# Step 2: Run Opus + attractor guide
+PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  --dataset Mango_Leaf_Disease \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+  --model opus \
+  --confusion-guide CyberVisionAg/open_agentic/confusion_guides/Mango_Leaf_Disease.md
+
+# === PLOTS ===
+# Generate confusion matrix for any run
+python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
+  --results-dir <results_dir> --output <output.png> --title "<title>"
+```
+
+### Adding a new crop (checklist)
+
+When adding attractor guide support for a new crop:
+1. **Ensure baseline results exist** -- run Opus baseline eval for the crop (no attractor guide)
+2. **Build the attractor guide** -- run `build_confusion_guide.py` with all baseline result dirs for that crop
+3. **Run Opus + attractor guide** -- same config as baseline but with `--confusion-guide` pointing to the new guide
+4. **Compare** -- check accuracy delta vs baseline
+
 ### Future TODO
-- [ ] Fix resolution mismatch: increase collage tile cap from 400px to 800px (one-line change in `make_collages`) so agent sees comparable resolution to few-shot
-- [ ] Re-run corn KB generation — was done with fixed env but worth verifying coverage improved
+- [ ] Build attractor guides from training data only (cross-val) for paper defensibility
 - [ ] Multiple seeds (42, 123, 456) for error bars on final numbers
+- [ ] Test on additional crops (Tomato, Wheat)

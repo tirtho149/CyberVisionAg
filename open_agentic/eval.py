@@ -300,6 +300,7 @@ def run_single_image(
     k: int | None,
     timeout: int,
     log_dir: Path | None,
+    confusion_guide_path: str | None = None,
 ) -> dict:
     """Classify one test image via a claude -p agent."""
 
@@ -312,7 +313,8 @@ def run_single_image(
 
     try:
         result = _run_agent(
-            tmp.name, ground_truth, classes, ref_images, kb_text, k, timeout
+            tmp.name, ground_truth, classes, ref_images, kb_text, k, timeout,
+            confusion_guide_path,
         )
     finally:
         os.unlink(tmp.name)
@@ -344,11 +346,12 @@ def _run_agent(
     kb_text: str | None,
     k: int | None,
     timeout: int,
+    confusion_guide_path: str | None = None,
 ) -> dict:
     """Spawn claude -p subprocess and parse results."""
-    system_prompt = build_system_prompt()
+    system_prompt = build_system_prompt(has_attractor_guide=bool(confusion_guide_path))
     user_message = build_user_message(
-        test_image_path, classes, ref_images, kb_text, k
+        test_image_path, classes, ref_images, kb_text, k, confusion_guide_path
     )
 
     cmd = [
@@ -589,6 +592,7 @@ def run_eval(
     parallel: int,
     timeout: int,
     log_dir: Path,
+    confusion_guide_path: str | None = None,
 ) -> list[dict]:
     """Run evaluation on all test images with parallel dispatch."""
     results = []
@@ -600,7 +604,8 @@ def run_eval(
         print(f"  {label} {gt} ...", end="", flush=True)
         t0 = time.time()
         result = run_single_image(
-            img_path, gt, classes, ref_images, kb_text, k, timeout, log_dir
+            img_path, gt, classes, ref_images, kb_text, k, timeout, log_dir,
+            confusion_guide_path,
         )
         elapsed = time.time() - t0
         status = "OK" if result["correct"] else "WRONG"
@@ -660,6 +665,8 @@ def main():
                         help="Include Pathogen, Type, Affected Parts in KB (not just Visual Description)")
     parser.add_argument("--kb-file", type=str, default=None,
                         help="Custom KB markdown file (overrides --symptom-source)")
+    parser.add_argument("--confusion-guide", type=str, default=None,
+                        help="Path to confusion guide markdown file (agent reads it as a separate tool call)")
     args = parser.parse_args()
 
     # Set active model from CLI
@@ -692,6 +699,8 @@ def main():
 
     # Setup logging — dir includes crop/kb/model/k so configs don't clobber
     k_label = f"k{args.k}" if args.k else "kunlimited"
+    if args.confusion_guide:
+        k_label += "_cg"  # distinguish confusion-guide runs
     log_dir = RESULTS_DIR / args.dataset / kb_label / _ACTIVE_MODEL / k_label
     # Clear only this specific config's prior results
     if log_dir.exists():
@@ -728,10 +737,21 @@ def main():
     print(f"  Logs          : {log_dir}/")
     print()
 
+    # Resolve confusion guide path
+    confusion_guide_path = None
+    if args.confusion_guide:
+        cg = Path(args.confusion_guide)
+        if cg.exists():
+            confusion_guide_path = str(cg.resolve())
+            print(f"  Confusion guide: {confusion_guide_path}")
+        else:
+            print(f"  WARNING: confusion guide not found: {cg}")
+
     # Run
     results = run_eval(
         classes, test_images, ref_images, kb_text,
         args.k, args.parallel, args.timeout, log_dir,
+        confusion_guide_path,
     )
 
     # Metrics
@@ -751,7 +771,8 @@ def main():
                 "k": args.k,
                 "parallel": args.parallel,
                 "seed": args.seed,
-                "model": MODEL,
+                "model": _ACTIVE_MODEL,
+                "confusion_guide": args.confusion_guide,
             },
             "metrics": {k: v for k, v in metrics.items()
                         if k != "per_class_accuracy"},

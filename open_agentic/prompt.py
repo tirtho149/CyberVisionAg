@@ -1,18 +1,31 @@
 """Prompt construction for the open agentic pipeline."""
 
 
-def build_system_prompt() -> str:
+def build_system_prompt(has_attractor_guide: bool = False) -> str:
     """Short role-setting system prompt appended to Claude Code defaults."""
-    return (
+    steps = (
         "You are an expert plant pathologist classifying a diseased plant image.\n\n"
         "## Strategy\n"
         "1. Read the test image first. Note the affected plant part (leaf, stem, pod, "
         "root, whole plant) and key visual features (color, shape, pattern, texture).\n"
-        "2. Review the symptom descriptions below to narrow candidates — identify "
+        "2. Review the symptom descriptions below to narrow candidates -- identify "
         "classes whose descriptions match your visual observations.\n"
         "3. View reference images for your top candidates (use your full budget). "
-        "Compare carefully — look for the specific feature that distinguishes each.\n"
-        "4. Submit your prediction.\n\n"
+        "Compare carefully -- look for the specific feature that distinguishes each.\n"
+    )
+
+    if has_attractor_guide:
+        steps += (
+            "4. State your initial prediction.\n"
+            "5. THEN read the Attractor Guide file. Look up your prediction. "
+            "If it is listed as over-predicted, view references for the "
+            "alternatives listed before confirming. Do NOT read this file earlier.\n"
+            "6. Submit your final prediction.\n\n"
+        )
+    else:
+        steps += "4. Submit your prediction.\n\n"
+
+    steps += (
         "End your response with exactly this JSON block:\n"
         "```json\n"
         '{"prediction": "<class_name>", "confidence": <0.0-1.0>, '
@@ -20,6 +33,7 @@ def build_system_prompt() -> str:
         "```\n"
         "The prediction MUST be one of the provided class names (exact match)."
     )
+    return steps
 
 
 def build_user_message(
@@ -28,6 +42,7 @@ def build_user_message(
     ref_images: dict[str, list[str]],
     kb_text: str | None,
     k: int | None,
+    confusion_guide_path: str | None = None,
 ) -> str:
     """Build the user message with test image, classes, KB, and budget.
 
@@ -37,6 +52,7 @@ def build_user_message(
         ref_images: {class_name: [list_of_paths]}.
         kb_text: Symptom KB text (markdown), or None.
         k: Max reference images the agent should view, or None for unlimited.
+        confusion_guide_path: Path to attractor guide markdown file, or None.
     """
     parts = []
 
@@ -82,6 +98,17 @@ def build_user_message(
     if kb_text:
         parts.append(
             "## Symptom Descriptions (Knowledge Base)\n\n" + kb_text
+        )
+
+    # Attractor guide (separate file, read AFTER forming initial prediction)
+    if confusion_guide_path:
+        parts.append(
+            "## Attractor Guide (read ONLY after forming your initial prediction)\n\n"
+            "This file lists classes that are frequently over-predicted. "
+            "**Do NOT read this file until step 5** -- first do all your normal "
+            "analysis (steps 1-4), state your initial prediction, and only then "
+            "read this file to check if your prediction is a known attractor.\n"
+            f"`{confusion_guide_path}`"
         )
 
     parts.append(
