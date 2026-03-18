@@ -34,12 +34,11 @@ def load_results(results_dir: Path) -> list[dict]:
 
 def build_attractor_map(
     all_results: list[dict],
-    min_wrong: int = 3,
+    top_n: int = 4,
 ) -> dict[str, list[tuple[str, int]]]:
     """Build attractor map: {predicted_class: [(actual_class, count), ...]}.
 
-    Only includes classes that were wrongly predicted at least `min_wrong`
-    times total. Entries sorted by count descending.
+    Takes the top_n most over-predicted classes by total wrong count.
     """
     # Count: when class X was predicted, what was the actual class?
     wrong_by_pred = defaultdict(lambda: defaultdict(int))
@@ -49,13 +48,16 @@ def build_attractor_map(
         if not r.get("correct") and not r.get("error") and gt and pred:
             wrong_by_pred[pred][gt] += 1
 
-    # Filter to attractor classes (wrongly predicted >= min_wrong times)
+    # Rank all classes by total wrong predictions, take top_n
+    ranked = sorted(
+        wrong_by_pred.items(),
+        key=lambda x: -sum(x[1].values()),
+    )
     attractors = {}
-    for pred_cls, actuals in wrong_by_pred.items():
-        total_wrong = sum(actuals.values())
-        if total_wrong >= min_wrong:
-            sorted_actuals = sorted(actuals.items(), key=lambda x: -x[1])
-            attractors[pred_cls] = sorted_actuals
+    for pred_cls, actuals in ranked[:top_n]:
+        sorted_actuals = sorted(actuals.items(), key=lambda x: -x[1])
+        total = sum(v for _, v in sorted_actuals)
+        attractors[pred_cls] = sorted_actuals
 
     return attractors
 
@@ -99,8 +101,8 @@ def main():
         help="Output markdown file path",
     )
     parser.add_argument(
-        "--min-wrong", type=int, default=3,
-        help="Minimum wrong predictions to qualify as attractor (default: 3)",
+        "--top-n", type=int, default=4,
+        help="Number of top attractor classes to include (default: 4)",
     )
     args = parser.parse_args()
 
@@ -120,23 +122,33 @@ def main():
         return
 
     # Build attractor map
-    attractors = build_attractor_map(all_results, min_wrong=args.min_wrong)
+    attractors = build_attractor_map(all_results, top_n=args.top_n)
 
     print(f"\nTotal results: {len(all_results)}")
-    print(f"Attractor classes (wrongly predicted >= {args.min_wrong}x): {len(attractors)}")
+    print(f"Top {args.top_n} attractor classes:")
     for pred_cls in sorted(attractors, key=lambda c: -sum(n for _, n in attractors[c])):
         total = sum(n for _, n in attractors[pred_cls])
         actuals_str = ", ".join(f"{a}({n})" for a, n in attractors[pred_cls])
         print(f"  {pred_cls}: {total}x wrong -> {actuals_str}")
 
-    # Generate guide
-    guide = generate_attractor_guide(attractors)
-
-    # Save
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(guide)
-    print(f"\nSaved attractor guide: {output_path} ({len(guide)} chars)")
+    # Save per-class files
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    # Clear old files
+    for old in output_dir.glob("*.md"):
+        old.unlink()
+    for pred_cls in attractors:
+        actuals = attractors[pred_cls]
+        total = sum(n for _, n in actuals)
+        lines = [
+            f"This class is over-predicted ({total}x wrong in past evaluations).",
+            "When agents predicted this class, the actual class was:",
+        ]
+        for actual, count in actuals:
+            lines.append(f"- {actual} ({count}x)")
+        lines.append("Before confirming, view references for these alternatives.")
+        (output_dir / f"{pred_cls}.md").write_text("\n".join(lines))
+    print(f"\nSaved {len(attractors)} attractor files to: {output_dir}/")
 
 
 if __name__ == "__main__":

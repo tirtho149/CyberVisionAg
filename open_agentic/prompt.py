@@ -1,7 +1,7 @@
 """Prompt construction for the open agentic pipeline."""
 
 
-def build_system_prompt(has_attractor_guide: bool = False) -> str:
+def build_system_prompt(attractor_guide_dir: str | None = None) -> str:
     """Short role-setting system prompt appended to Claude Code defaults."""
     steps = (
         "You are an expert plant pathologist classifying a diseased plant image.\n\n"
@@ -14,12 +14,13 @@ def build_system_prompt(has_attractor_guide: bool = False) -> str:
         "Compare carefully -- look for the specific feature that distinguishes each.\n"
     )
 
-    if has_attractor_guide:
+    if attractor_guide_dir:
         steps += (
             "4. State your initial prediction.\n"
-            "5. THEN read the Attractor Guide file. Look up your prediction. "
-            "If it is listed as over-predicted, view references for the "
-            "alternatives listed before confirming. Do NOT read this file earlier.\n"
+            "5. Check if your prediction is a known attractor by reading "
+            f"`{attractor_guide_dir}/{{your_prediction}}.md`. "
+            "If the file exists, it lists alternatives -- view their references "
+            "before confirming. If the file does not exist, your prediction is fine.\n"
             "6. Submit your final prediction.\n\n"
         )
     else:
@@ -42,7 +43,7 @@ def build_user_message(
     ref_images: dict[str, list[str]],
     kb_text: str | None,
     k: int | None,
-    confusion_guide_path: str | None = None,
+    attractor_guide_dir: str | None = None,
 ) -> str:
     """Build the user message with test image, classes, KB, and budget.
 
@@ -52,7 +53,7 @@ def build_user_message(
         ref_images: {class_name: [list_of_paths]}.
         kb_text: Symptom KB text (markdown), or None.
         k: Max reference images the agent should view, or None for unlimited.
-        confusion_guide_path: Path to attractor guide markdown file, or None.
+        attractor_guide_dir: Directory with per-class attractor .md files, or None.
     """
     parts = []
 
@@ -100,15 +101,17 @@ def build_user_message(
             "## Symptom Descriptions (Knowledge Base)\n\n" + kb_text
         )
 
-    # Attractor guide (separate file, read AFTER forming initial prediction)
-    if confusion_guide_path:
+    # Attractor guide instruction
+    if attractor_guide_dir:
         parts.append(
-            "## Attractor Guide (read ONLY after forming your initial prediction)\n\n"
-            "This file lists classes that are frequently over-predicted. "
-            "**Do NOT read this file until step 5** -- first do all your normal "
-            "analysis (steps 1-4), state your initial prediction, and only then "
-            "read this file to check if your prediction is a known attractor.\n"
-            f"`{confusion_guide_path}`"
+            "## Attractor Guide (check AFTER forming your initial prediction)\n\n"
+            "After forming your initial prediction (step 4), check if it is a known "
+            "attractor class by reading:\n"
+            f"`{attractor_guide_dir}/{{your_prediction}}.md`\n\n"
+            "If the file exists, it lists classes that were actually correct when "
+            "agents wrongly predicted your candidate. View references for those "
+            "alternatives before confirming. If the file does not exist, your "
+            "prediction is not a known attractor -- proceed to submit."
         )
 
     parts.append(

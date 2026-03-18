@@ -300,7 +300,7 @@ def run_single_image(
     k: int | None,
     timeout: int,
     log_dir: Path | None,
-    confusion_guide_path: str | None = None,
+    attractor_guide_dir: str | None = None,
 ) -> dict:
     """Classify one test image via a claude -p agent."""
 
@@ -314,7 +314,7 @@ def run_single_image(
     try:
         result = _run_agent(
             tmp.name, ground_truth, classes, ref_images, kb_text, k, timeout,
-            confusion_guide_path,
+            attractor_guide_dir,
         )
     finally:
         os.unlink(tmp.name)
@@ -346,12 +346,13 @@ def _run_agent(
     kb_text: str | None,
     k: int | None,
     timeout: int,
-    confusion_guide_path: str | None = None,
+    attractor_guide_dir: str | None = None,
 ) -> dict:
     """Spawn claude -p subprocess and parse results."""
-    system_prompt = build_system_prompt(has_attractor_guide=bool(confusion_guide_path))
+    system_prompt = build_system_prompt(attractor_guide_dir=attractor_guide_dir)
     user_message = build_user_message(
-        test_image_path, classes, ref_images, kb_text, k, confusion_guide_path
+        test_image_path, classes, ref_images, kb_text, k,
+        attractor_guide_dir=attractor_guide_dir,
     )
 
     cmd = [
@@ -592,7 +593,7 @@ def run_eval(
     parallel: int,
     timeout: int,
     log_dir: Path,
-    confusion_guide_path: str | None = None,
+    attractor_guide_dir: str | None = None,
 ) -> list[dict]:
     """Run evaluation on all test images with parallel dispatch."""
     results = []
@@ -605,7 +606,7 @@ def run_eval(
         t0 = time.time()
         result = run_single_image(
             img_path, gt, classes, ref_images, kb_text, k, timeout, log_dir,
-            confusion_guide_path,
+            attractor_guide_dir,
         )
         elapsed = time.time() - t0
         status = "OK" if result["correct"] else "WRONG"
@@ -737,21 +738,22 @@ def main():
     print(f"  Logs          : {log_dir}/")
     print()
 
-    # Resolve confusion guide path
-    confusion_guide_path = None
+    # Resolve attractor guide directory
+    attractor_guide_dir = None
     if args.confusion_guide:
         cg = Path(args.confusion_guide)
-        if cg.exists():
-            confusion_guide_path = str(cg.resolve())
-            print(f"  Confusion guide: {confusion_guide_path}")
+        if cg.is_dir():
+            attractor_guide_dir = str(cg.resolve())
+            n_files = len(list(cg.glob("*.md")))
+            print(f"  Attractor guide: {attractor_guide_dir} ({n_files} classes)")
         else:
-            print(f"  WARNING: confusion guide not found: {cg}")
+            print(f"  WARNING: attractor guide dir not found: {cg}")
 
     # Run
     results = run_eval(
         classes, test_images, ref_images, kb_text,
         args.k, args.parallel, args.timeout, log_dir,
-        confusion_guide_path,
+        attractor_guide_dir,
     )
 
     # Metrics
