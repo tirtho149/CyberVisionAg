@@ -191,7 +191,7 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - **Type**: 1x3 line plot panel (one per crop)
 - **Config**: `figsize=(13, 4)`, large rcParams
 - **Lines**: Agent no-KB, Agent+internet KB (+ Agent+local KB for soybean)
-- **Horizontal dashed line**: Zero-shot floor
+- **No dashed line**: DC baseline removed; k=0 is the leftmost point on the curve
 - **X-axis**: k (0, 1, 4, 8, 16)
 - **Y-axis**: Accuracy (%)
 - **Include**: Error bars or shaded bands showing per-class std
@@ -200,7 +200,7 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 ### Figure 5: Model Scaling + Zero-shot Comparison (combined dense figure)
 - **Type**: 1x2 panel or similar dense layout
 - **Left panel**: Model ablation (haiku/sonnet/opus) across all 3 crops — grouped bars with std error bars
-- **Right panel**: Zero-shot vs Agent no-KB vs Agent+KB at a fixed k, all 3 crops
+- **Right panel**: Baseline (k=0, no KB) vs Agent no-KB vs Agent+KB at k=4, all 3 crops
 - **Config**: `figsize=(11, 4)` or similar — dense, one figure showing multiple dimensions
 - **Purpose**: Two findings in one figure — model quality scaling and KB effect
 
@@ -230,8 +230,10 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - Model ablation shown in Figure 5 (no separate table needed)
 - [x] **DONE**: Baseline changed from DC to Agent(no KB, k=0). DC removed from table, figures, and text.
 - [ ] **TODO (local k=0)**: Soybean local/sonnet/k0 is MISSING. Shows as -- in table. Run if needed.
-- [x] **DONE**: Attractor guide table added (`table_attractor_guide.tex`).
-- [ ] **TODO**: Add attractor guide table as separate table (Opus, internet KB, k=8 baseline vs k=8_cg). Data from `{crop}/internet/opus/k8/summary.json` vs `k8_cg/summary.json`. 3 crops. This is a separate subsection in results.
+- [x] **DONE**: Attractor guide table added (`table_attractor_guide.tex`) with Mean delta row (+5.2pp).
+- [x] **DONE**: Main results table has Mean delta rows for Agent(no KB) and Agent+internet KB.
+- [x] **DONE**: Few-shot comparison table simplified to few-shot only (agent numbers already in Table 1), with Mean delta row.
+- [x] **DONE**: Confusion matrix titles updated to "Baseline (X%)" and "Calibration Enabled (X%)".
 
 ---
 
@@ -277,7 +279,7 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - [x] Section 6: Experiments (setup, results with inline numbers verified against data, figures/tables/trace referenced)
 - [x] Section 7: Discussion (3 paragraphs: main findings, few-shot comparison with appendix table, limitations)
 - [x] Section 8: Conclusion merged into Discussion
-- [ ] Abstract (write last)
+- [x] Abstract (written -- 613K images, KB +10.7pp avg, calibration +6.2pp, no task-specific training, benefits from future models)
 
 ### Phase 5: Literature review
 - [x] Receive abstracts and references.bib files from user

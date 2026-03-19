@@ -86,6 +86,7 @@ def table_main_results():
     lines.append(r"\small")
     lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. The baseline is Agent (no KB) at $k{=}0$ (model receives only the test image and class names). Values show accuracy\,\% with improvement over baseline in parentheses. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:main_results}")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
     lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
     lines.append(r"Crop & Method & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
@@ -120,11 +121,50 @@ def table_main_results():
 
         lines.append(r"\midrule")
 
-    lines[-1] = r"\bottomrule"
+    # Average improvement (pp) over each crop's own baseline, averaged across crops
+    # Only for methods present in all 3 crops: "none" and "internet"
+    avg_methods = [
+        ("none", "Agent (no KB)"),
+        ("internet", "Agent + internet KB"),
+    ]
+    crop_baselines = {
+        crop_id: _load(crop_id, "none", "sonnet", 0)
+        for crop_id, _, _ in crops
+    }
+
+    lines[-1] = r"\midrule"
+    first_avg = True
+    for source, label in avg_methods:
+        cells = []
+        for k in ks:
+            deltas = []
+            for crop_id, _, _ in crops:
+                acc = _load(crop_id, source, "sonnet", k)
+                bl = crop_baselines[crop_id]
+                if acc is not None and bl is not None:
+                    deltas.append(acc - bl)
+            if deltas:
+                avg_delta = sum(deltas) / len(deltas)
+                sign = "+" if avg_delta >= 0 else ""
+                cells.append(f"{sign}{avg_delta:.1f}")
+            else:
+                cells.append("—")
+        prefix = r"\textit{Mean $\Delta$ (pp)}" if first_avg else ""
+        lines.append(f"{prefix} & \\textit{{{label}}} & " + " & ".join(cells) + r" \\")
+        first_avg = False
+
+    lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
+    lines.append(r"}%end resizebox")
     lines.append(r"\end{table*}")
 
-    return "\n".join(lines)
+    # Update caption to mention the mean row
+    old_caption_end = r"Best per crop--$k$ in \textbf{bold}.}"
+    new_caption_end = r"Best per crop--$k$ in \textbf{bold}. Bottom rows show mean improvement (pp) over baseline, averaged across crops.}"
+    result = "\n".join(lines)
+    result = result.replace(old_caption_end, new_caption_end)
+
+    return result
 
 
 # ── Table 3: Model ablation ──────────────────────────────────────────────────
@@ -241,7 +281,7 @@ def table_appendix_delta():
 # ── Table: Few-shot comparison (appendix) ─────────────────────────────────────
 
 def table_fewshot_comparison():
-    """Appendix table comparing few-shot baseline vs agent across k values."""
+    """Appendix table: few-shot accuracy with delta from baseline (Agent no KB, k=0)."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
@@ -253,42 +293,45 @@ def table_fewshot_comparison():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Comparison with single-pass few-shot classification. Few-shot receives $k$ randomly sampled labeled images in a single API call with no reasoning. The agent uses deliberative multi-turn reasoning with selective reference viewing. Accuracy (\%), 3 test images per class.}")
+    lines.append(r"\caption{Single-pass few-shot classification accuracy. The model receives $k$ randomly sampled labeled images in a single API call with no reasoning loop (Sonnet, 3 test images per class). Baseline is Agent (no KB) at $k{=}0$. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:fewshot}")
-    lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
+    lines.append(r"\begin{tabular}{l" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
-    lines.append(r"Crop & Method & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
+    lines.append(r"Crop & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
     lines.append(r"\midrule")
 
+    all_deltas_per_k = {k: [] for k in ks}
+
     for crop_id, crop_label in crops:
-        # Few-shot results
+        baseline = _load(crop_id, "none", "sonnet", 0)
         fs_accs = [_load(crop_id, "few_shot", "sonnet", k) for k in ks]
-        # Agent + internet KB results
-        ag_accs = [_load(crop_id, "internet", "sonnet", k) for k in ks]
 
-        # Find best per k
-        best_per_k = {}
-        for i, k in enumerate(ks):
-            vals = [v for v in [fs_accs[i], ag_accs[i]] if v is not None]
-            best_per_k[k] = max(vals) if vals else -1
+        # Best per k for bolding
+        best = max((a for a in fs_accs if a is not None), default=-1)
 
-        # Few-shot row
         cells = []
         for i, k in enumerate(ks):
-            is_best = fs_accs[i] is not None and abs(fs_accs[i] - best_per_k[k]) < 0.01
-            cells.append(_fmt(fs_accs[i], bold=is_best))
-        lines.append(f"{crop_label} & Few-shot (single-pass) & " + " & ".join(cells) + r" \\")
+            acc = fs_accs[i]
+            is_best = acc is not None and abs(acc - best) < 0.01
+            cells.append(_fmt_with_delta(acc, baseline, bold=is_best))
+            if acc is not None and baseline is not None:
+                all_deltas_per_k[k].append(acc - baseline)
+        lines.append(f"{crop_label} & " + " & ".join(cells) + r" \\")
 
-        # Agent row
-        cells = []
-        for i, k in enumerate(ks):
-            is_best = ag_accs[i] is not None and abs(ag_accs[i] - best_per_k[k]) < 0.01
-            cells.append(_fmt(ag_accs[i], bold=is_best))
-        lines.append(f" & Agent + internet KB & " + " & ".join(cells) + r" \\")
+    # Mean delta row
+    lines.append(r"\midrule")
+    cells = []
+    for k in ks:
+        deltas = all_deltas_per_k[k]
+        if deltas:
+            avg = sum(deltas) / len(deltas)
+            sign = "+" if avg >= 0 else ""
+            cells.append(f"\\textit{{{sign}{avg:.1f}}}")
+        else:
+            cells.append("—")
+    lines.append(r"\textit{Mean $\Delta$ (pp)} & " + " & ".join(cells) + r" \\")
 
-        lines.append(r"\midrule")
-
-    lines[-1] = r"\bottomrule"
+    lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
     lines.append(r"\end{table*}")
 
@@ -316,6 +359,7 @@ def table_attractor_guide():
     lines.append(r"Crop & Baseline & + Attractor & $\Delta$ \\")
     lines.append(r"\midrule")
 
+    all_deltas = []
     for crop_id, crop_label in crops:
         base = _load(crop_id, "internet", "opus", 8)
         # Attractor guide results use k8_cg directory
@@ -330,8 +374,16 @@ def table_attractor_guide():
             bold = delta > 0
             ag_str = _fmt(ag, bold=bold)
             lines.append(f"{crop_label} & {_fmt(base)} & {ag_str} & {sign}{delta:.1f} \\\\")
+            all_deltas.append(delta)
         else:
             lines.append(f"{crop_label} & {_fmt(base)} & — & — \\\\")
+
+    # Mean delta row
+    if all_deltas:
+        mean_delta = sum(all_deltas) / len(all_deltas)
+        sign = "+" if mean_delta >= 0 else ""
+        lines.append(r"\midrule")
+        lines.append(f"\\textit{{Mean}} & & & \\textit{{{sign}{mean_delta:.1f}}} \\\\")
 
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
