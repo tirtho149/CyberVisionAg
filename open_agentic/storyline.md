@@ -6,6 +6,10 @@
 
 ---
 
+## One-liner
+
+Plant disease diagnosis at scale is bottlenecked by the lack of datasets that cover enough crops and diseases. We compile one of the largest disease image datasets (613K images, 55 crops, 477 classes) from multiple sources and complement it with automatically generated, source-cited symptom descriptions. We demonstrate how this combination of visual and structured knowledge enables an agentic reasoning system to diagnose diseases across crops with full transparency and no task-specific training.
+
 ## Big Picture
 
 We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~670,000 images across 56 crops (478 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 27 classes, Corn 24 classes, Mango 7 classes) — chosen to represent different scales of difficulty. Evaluation on additional crops is planned but limited by the compute-intensive nature of agentic inference.
@@ -87,6 +91,7 @@ The system is designed around **explainability**: every diagnosis produces a ful
 - Multi-turn reasoning: observe test image → form hypotheses → select reference → compare → articulate → decide
 - Reference budget k controls how many collages the agent can view
 - Prompt design and reasoning structure
+- [x] **DONE**: Section 5 briefly mentions calibration phase with forward reference to `sec:calibration`
 
 ### Section 6: Experiments (`sec:experiments`)
 - Datasets and setup
@@ -96,6 +101,9 @@ The system is designed around **explainability**: every diagnosis produces a ful
 - Per-class std captures instability / variance across disease classes
 - Results and analysis
 - Qualitative: example reasoning traces
+- [x] **DONE (k=0)**: Updated k range to `(0, 1, 4, 8, 16)` in main.tex, generate_tables.py, generate_figures.py. Regenerated table and figure.
+- [x] **DONE (attractor guide)**: Subsection "Calibration via Attractor Guide" (`sec:calibration`) in Section 6. Framed as a calibration phase, not session memory. Table from `table_attractor_guide.tex`. Confusion matrices for all 3 crops (Soybean in main text, Corn+Mango in appendix). Caption and text both cite Phytophthora column (data-backed).
+- [x] **DONE (calibration trace)**: `Septoria_brown_spot_test_006` from `k8_cg/traces/`. Agent initially predicted Frogeye_leaf_spot, read `Frogeye_leaf_spot.md` calibration file (over-predicted 20x, actual usually Septoria 5x), reconsidered visual differences (gray centers vs uniformly dark brown), changed to Septoria_brown_spot (correct). Output: `traces/trace_calibration.tex`. To regenerate: `trace_to_tex('Soybean_Diseases', 'internet', 'opus', 8, 'Septoria_brown_spot_test_006', k_label='k8_cg')`. To pick a new trace: search AG traces for correct predictions where pre-calibration text mentions a different initial class than the final prediction.
 
 ### Section 7: Discussion (`sec:discussion`)
 - Few-shot vs agentic reasoning: different inference paradigms. Few-shot processes all references in a single forward pass with no structured comparison — it is a black box. Our approach is deliberative and sequential, optimizing for explainability. There is a cost to this (more compute per image), but in agricultural diagnostics, transparency and verifiability are essential.
@@ -103,6 +111,8 @@ The system is designed around **explainability**: every diagnosis produces a ful
 - Failure analysis: visually ambiguous diseases
 - Cost-accuracy tradeoffs
 - Limitations
+- [x] **DONE (k=0)**: k=0 included in all tables/figures
+- [x] **DONE (calibration)**: Discussion frames calibration as agent learning from its own prediction history, not session memory. Scales with model capability.
 
 ### Section 8: Conclusion (`sec:conclusion`)
 
@@ -150,6 +160,16 @@ bash open_agentic/run_sweeps.sh results mango
 ```
 Every generated artifact (figures, traces, tables) has a single command that reproduces it from raw data. If experiments are rerun or data changes, only the relevant command needs to be re-executed.
 
+```bash
+# Confusion matrix plots + per-class change analysis (for updating main.tex examples)
+python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
+  --results-dir CyberVisionAg/results/open_agentic/{Dataset}/internet/opus/k8_cg \
+  --output writing/.../figures/confusion_matrix_opus_attractor.png \
+  --title "+ Attractor Guide" \
+  --compare-with CyberVisionAg/results/open_agentic/{Dataset}/internet/opus/k8
+# Prints per-class accuracy changes and over-prediction shifts. Use these to update specific examples cited in main.tex.
+```
+
 ### Figure 1: System Overview (already in main.tex as `fig:overview`)
 - Block diagram: Crop name → Registry pipeline → Disease Registry → Agent + Images → Prediction
 - Already implemented in TikZ
@@ -172,7 +192,7 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - **Config**: `figsize=(13, 4)`, large rcParams
 - **Lines**: Agent no-KB, Agent+internet KB (+ Agent+local KB for soybean)
 - **Horizontal dashed line**: Zero-shot floor
-- **X-axis**: k (1, 4, 8, 16)
+- **X-axis**: k (0, 1, 4, 8, 16)
 - **Y-axis**: Accuracy (%)
 - **Include**: Error bars or shaded bands showing per-class std
 - **Purpose**: Show lift over zero-shot, scaling with k, KB contribution, and variance — all in one dense figure
@@ -204,10 +224,14 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - Crops, number of classes, train/test image counts, KB coverage
 
 ### Table 2: Main Results (in-text, only table)
-- Method × k with accuracy % and delta from zero-shot
+- Method × k with accuracy % and delta from baseline (Agent no KB, k=0)
 - Auto-generated via `generate_tables.py` from summary JSONs
 - Bold best per crop-k, caption notes 3 images/class
 - Model ablation shown in Figure 5 (no separate table needed)
+- [x] **DONE**: Baseline changed from DC to Agent(no KB, k=0). DC removed from table, figures, and text.
+- [ ] **TODO (local k=0)**: Soybean local/sonnet/k0 is MISSING. Shows as -- in table. Run if needed.
+- [x] **DONE**: Attractor guide table added (`table_attractor_guide.tex`).
+- [ ] **TODO**: Add attractor guide table as separate table (Opus, internet KB, k=8 baseline vs k=8_cg). Data from `{crop}/internet/opus/k8/summary.json` vs `k8_cg/summary.json`. 3 crops. This is a separate subsection in results.
 
 ---
 
@@ -224,6 +248,7 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [x] Create `CyberVisionAg/open_agentic/generate_figures.py` (reads directly from summary JSONs + `all-crops.xlsx`)
 - [x] Figure 3: Sunburst — crop-disease hierarchy (Plotly, exported via kaleido)
 - [x] Figure 4: Accuracy vs k line plots (1x3 panel) with zero-shot floor
+  - [x] **DONE**: Regenerated with k=0 as leftmost point
 - [x] Figure 5: Model scaling + KB comparison (1x2 combined panel)
 - [ ] Figure 6: Per-class accuracy heatmap (deferred)
 - [x] All plots read from raw data files — no hardcoded numbers
@@ -261,12 +286,6 @@ Every generated artifact (figures, traces, tables) has a single command that rep
 - [x] Write Section 2: Related Work from provided references
 - [x] References integrated naturally into Introduction and Related Work
 - [ ] Iterate with user on coverage and framing (ongoing)
-
-### Phase 5b: Attractor guide results subsection
-- [ ] Add subsection in Results (Section 6): attractor-based self-correction
-- [ ] Baseline vs attractor guide table (3 crops, numbers from script)
-- [ ] Confusion matrix heatmaps before/after
-- [ ] Mention in Discussion as agentic self-improvement
 
 ### Phase 6: Polish
 - [ ] Cross-check all numbers: text vs figures vs tables vs summary JSONs

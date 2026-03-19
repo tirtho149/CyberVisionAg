@@ -67,13 +67,13 @@ def _fmt_delta(acc, baseline, bold=False):
 # ── Table 2: Main results (method × k, sonnet) ───────────────────────────────
 
 def table_main_results():
-    """Compact table: direct classification + agent methods, accuracy % only."""
+    """Compact table: agent methods across k, delta from Agent(no KB, k=0) baseline."""
     crops = [
         ("Soybean_Diseases", "Soybean (27)", ["none", "local", "internet"]),
         ("Corn_Diseases", "Corn (24)", ["none", "internet"]),
         ("Mango_Leaf_Disease", "Mango (7)", ["none", "internet"]),
     ]
-    ks = [1, 4, 8, 16]
+    ks = [0, 1, 4, 8, 16]
     method_labels = {
         "none": "Agent (no KB)",
         "local": "Agent + local KB",
@@ -84,7 +84,7 @@ def table_main_results():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. Values show accuracy\,\% with improvement over direct classification in parentheses. Best per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\caption{Diagnostic accuracy across crops, methods, and reference budgets $k$ (Sonnet model, 3 test images per class). Parentheses in the Crop column denote number of disease classes. The baseline is Agent (no KB) at $k{=}0$ (model receives only the test image and class names). Values show accuracy\,\% with improvement over baseline in parentheses. Best per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:main_results}")
     lines.append(r"\begin{tabular}{ll" + "r" * len(ks) + "}")
     lines.append(r"\toprule")
@@ -92,7 +92,8 @@ def table_main_results():
     lines.append(r"\midrule")
 
     for crop_id, crop_label, sources in crops:
-        zs = _load(crop_id, "few_shot", "sonnet", 0)
+        # Baseline: Agent (no KB) at k=0
+        baseline = _load(crop_id, "none", "sonnet", 0)
 
         # Collect all agent results to find best per k
         all_results = {}
@@ -105,19 +106,17 @@ def table_main_results():
             vals = [all_results[m][k] for m in all_results if all_results[m][k] is not None]
             best_per_k[k] = max(vals) if vals else -1
 
-        # Direct classif. row
-        zs_str = _fmt(zs)
-        lines.append(f"{crop_label} & Direct classif. & " + " & ".join([zs_str] * len(ks)) + r" \\")
-
-        # Agent rows with delta from direct classification
+        first_row = True
         for source in sources:
             label = method_labels[source]
             cells = []
             for k in ks:
                 acc = all_results[label][k]
                 is_best = acc is not None and abs(acc - best_per_k[k]) < 0.01
-                cells.append(_fmt_with_delta(acc, zs, bold=is_best))
-            lines.append(f" & {label} & " + " & ".join(cells) + r" \\")
+                cells.append(_fmt_with_delta(acc, baseline, bold=is_best))
+            prefix = crop_label if first_row else ""
+            lines.append(f"{prefix} & {label} & " + " & ".join(cells) + r" \\")
+            first_row = False
 
         lines.append(r"\midrule")
 
@@ -174,15 +173,15 @@ def table_model_ablation():
 # ── Table A1 (Appendix): Delta from direct classification ────────────────────────────────
 
 def table_appendix_delta():
-    """Appendix table showing improvement over direct classification for every config."""
+    """Appendix table showing improvement over Agent(no KB, k=0) baseline for every config."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
     ]
-    ks = [1, 4, 8, 16]
+    ks = [0, 1, 4, 8, 16]
 
-    # Define the configs to show (skip few_shot k>0 and experimental ones)
+    # Define the configs to show
     agent_configs = [
         ("none", "sonnet", "Agent, no KB (Sonnet)"),
         ("local", "sonnet", "Agent + local KB (Sonnet)"),
@@ -195,14 +194,14 @@ def table_appendix_delta():
     lines.append(r"\begin{table*}[t]")
     lines.append(r"\centering")
     lines.append(r"\small")
-    lines.append(r"\caption{Improvement over direct classification baseline (percentage points) across all configurations. 3 test images per class. Best improvement per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\caption{Improvement over baseline (percentage points) across all configurations. Baseline is Agent (no KB) at $k{=}0$. 3 test images per class. Best improvement per crop--$k$ in \textbf{bold}.}")
     lines.append(r"\label{tab:delta_results}")
 
     for crop_id, crop_label in crops:
-        zs = _load(crop_id, "few_shot", "sonnet", 0)
+        baseline = _load(crop_id, "none", "sonnet", 0)
 
         lines.append(f"\\vspace{{4pt}}")
-        lines.append(f"\\textbf{{{crop_label}}} (direct classification: {_fmt(zs)})\\\\[2pt]")
+        lines.append(f"\\textbf{{{crop_label}}} (baseline: {_fmt(baseline)})\\\\[2pt]")
         lines.append(r"\begin{tabular}{l" + "r" * len(ks) + "}")
         lines.append(r"\toprule")
         lines.append(r"Configuration & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
@@ -214,18 +213,18 @@ def table_appendix_delta():
             deltas = []
             for source, model, _ in agent_configs:
                 acc = _load(crop_id, source, model, k)
-                if acc is not None and zs is not None:
-                    deltas.append(acc - zs)
+                if acc is not None and baseline is not None:
+                    deltas.append(acc - baseline)
             best_delta[k] = max(deltas) if deltas else -999
 
         for source, model, label in agent_configs:
             cells = []
             for k in ks:
                 acc = _load(crop_id, source, model, k)
-                if acc is not None and zs is not None:
-                    delta = acc - zs
+                if acc is not None and baseline is not None:
+                    delta = acc - baseline
                     is_best = abs(delta - best_delta[k]) < 0.01
-                    cells.append(_fmt_delta(acc, zs, bold=is_best))
+                    cells.append(_fmt_delta(acc, baseline, bold=is_best))
                 else:
                     cells.append("—")
             lines.append(f"{label} & " + " & ".join(cells) + r" \\")
@@ -248,7 +247,7 @@ def table_fewshot_comparison():
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
     ]
-    ks = [1, 4, 8, 16]
+    ks = [0, 1, 4, 8, 16]
 
     lines = []
     lines.append(r"\begin{table*}[t]")
@@ -296,6 +295,51 @@ def table_fewshot_comparison():
     return "\n".join(lines)
 
 
+# ── Table: Attractor guide results ────────────────────────────────────────────
+
+def table_attractor_guide():
+    """Table comparing Opus baseline vs Opus + attractor guide at k=8."""
+    crops = [
+        ("Soybean_Diseases", "Soybean (27)"),
+        ("Corn_Diseases", "Corn (31)"),
+        ("Mango_Leaf_Disease", "Mango (7)"),
+    ]
+
+    lines = []
+    lines.append(r"\begin{table}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(r"\caption{Self-correction via attractor guide. Opus model, internet KB, $k=8$, 3 test images per class. The attractor guide identifies over-predicted classes and prompts the agent to reconsider before confirming.}")
+    lines.append(r"\label{tab:attractor}")
+    lines.append(r"\begin{tabular}{lrrr}")
+    lines.append(r"\toprule")
+    lines.append(r"Crop & Baseline & + Attractor & $\Delta$ \\")
+    lines.append(r"\midrule")
+
+    for crop_id, crop_label in crops:
+        base = _load(crop_id, "internet", "opus", 8)
+        # Attractor guide results use k8_cg directory
+        ag_path = RESULTS_DIR / crop_id / "internet" / "opus" / "k8_cg" / "summary.json"
+        ag = None
+        if ag_path.exists():
+            ag = json.loads(ag_path.read_text())["metrics"]["accuracy"]
+
+        if base is not None and ag is not None:
+            delta = ag - base
+            sign = "+" if delta >= 0 else ""
+            bold = delta > 0
+            ag_str = _fmt(ag, bold=bold)
+            lines.append(f"{crop_label} & {_fmt(base)} & {ag_str} & {sign}{delta:.1f} \\\\")
+        else:
+            lines.append(f"{crop_label} & {_fmt(base)} & — & — \\\\")
+
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table}")
+
+    return "\n".join(lines)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -318,6 +362,11 @@ def main():
     out = TABLES_OUT / "table_fewshot_comparison.tex"
     out.write_text(tex)
     print(f"  Few-shot comparison → {out.name}")
+
+    tex = table_attractor_guide()
+    out = TABLES_OUT / "table_attractor_guide.tex"
+    out.write_text(tex)
+    print(f"  Attractor guide → {out.name}")
 
 
 if __name__ == "__main__":

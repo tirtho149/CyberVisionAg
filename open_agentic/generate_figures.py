@@ -220,7 +220,7 @@ def figure_4_accuracy_vs_k():
         ("Corn_Diseases", "Corn (24 classes)", ["none", "internet"]),
         ("Mango_Leaf_Disease", "Mango (7 classes)", ["none", "internet"]),
     ]
-    ks = [1, 4, 8, 16]
+    ks = [0, 1, 4, 8, 16]
 
     method_styles = {
         "none":     {"label": "Agent (no KB)",       "color": "#3498db", "marker": "o", "ls": "-"},
@@ -231,16 +231,8 @@ def figure_4_accuracy_vs_k():
     fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=False)
 
     for ax, (crop, title, sources) in zip(axes, crops):
-        # Direct classif. floor
-        zs_acc, zs_std = get_accuracy_and_std(crop, "few_shot", "sonnet", 0)
-
         # Track all accuracy values for dynamic y-axis
         all_accs = []
-
-        if zs_acc is not None:
-            ax.axhline(y=zs_acc, color='#7f8c8d', linestyle='--', linewidth=1.2,
-                       label='Direct classif.', zorder=1)
-            all_accs.append(zs_acc)
 
         # Plot each method
         for source in sources:
@@ -362,11 +354,11 @@ def figure_5_model_and_kb():
     y_max = max(all_vals) if all_vals else 100
     ax1.set_ylim(0, min(100, y_max + 12))
 
-    # ── Panel (b): Direct classif. vs Agent vs Agent+KB at k=4 ─────────────────
+    # ── Panel (b): Baseline (k=0) vs Agent vs Agent+KB at k=4 ─────────────────
     methods = [
-        ("Direct classif.", "few_shot", "sonnet", 0, "#7f8c8d"),
-        ("Agent (no KB)", "none", "sonnet", 4, "#3498db"),
-        ("Agent + KB", "internet", "sonnet", 4, "#e74c3c"),
+        ("Baseline (k=0)", "none", "sonnet", 0, "#7f8c8d"),
+        ("Agent (no KB, k=4)", "none", "sonnet", 4, "#3498db"),
+        ("Agent + KB (k=4)", "internet", "sonnet", 4, "#e74c3c"),
     ]
 
     bar_width = 0.22
@@ -386,7 +378,7 @@ def figure_5_model_and_kb():
     ax2.set_xticks(x)
     ax2.set_xticklabels(crop_labels)
     ax2.set_ylabel("Accuracy (%)")
-    ax2.set_title("(b) Direct classif. vs Agent vs Agent+KB (k=4)", fontweight='bold')
+    ax2.set_title("(b) Baseline vs Agent vs Agent+KB (k=4)", fontweight='bold')
     ax2.legend(loc='upper left')
     ax2.grid(axis='y', linestyle='--', alpha=0.4)
 

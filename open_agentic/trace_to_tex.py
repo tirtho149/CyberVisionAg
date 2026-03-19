@@ -46,11 +46,13 @@ def trace_to_tex(
     model: str,
     k: int,
     image_name: str,
+    k_label=None,
 ) -> str:
     """Convert one trace to a LaTeX string."""
     # Load result
-    result_path = RESULTS_DIR / crop / kb_source / model / f"k{k}" / f"{image_name}.json"
-    trace_path = RESULTS_DIR / crop / kb_source / model / f"k{k}" / "traces" / f"{image_name}.json"
+    kdir = k_label or f"k{k}"
+    result_path = RESULTS_DIR / crop / kb_source / model / kdir / f"{image_name}.json"
+    trace_path = RESULTS_DIR / crop / kb_source / model / kdir / "traces" / f"{image_name}.json"
 
     if not result_path.exists() or not trace_path.exists():
         return f"% Trace not found: {result_path}"
@@ -94,6 +96,8 @@ def trace_to_tex(
             # Classify what was read
             if "classify" in fname or "test" in fname.lower():
                 action = "Observe test image"
+            elif "confusion_guides" in file_path:
+                action = f"Read calibration file: {fname}"
             else:
                 action = f"View reference: {fname}"
             step_num += 1
