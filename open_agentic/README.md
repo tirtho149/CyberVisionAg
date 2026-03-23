@@ -1451,9 +1451,50 @@ python -m CyberVisionAg.open_agentic.eval \
   --part-index CyberVisionAg/Prepared_Dataset/Soybean/part_index.md
 ```
 
+**Phase 2 result: 52.7% (39/74) = +2.7pp over Phase 1**
+
+Trace analysis of wrong predictions: 32/35 wrong cases had `gt_in_narrowed=False` -- the agent correctly identified the plant part and narrowed candidates, but picked the wrong class from the narrowed set due to visual similarity. The part index is working correctly; remaining errors are genuine visual confusion.
+
+### No-collage ablation -- DONE
+
+**Result: 51.4% (38/74) -- same as collage (52.7%), within noise**
+
+Individual full-res images vs collages (4 images per collage) at k=8:
+- Accuracy: 51.4% vs 52.7% (-1.3pp, within noise)
+- Avg refs read: 7.1 vs ~7 (comparable budget usage)
+- Avg duration: 77s vs ~35s (2x slower -- more Read tool calls)
+- Collage is preferred: same accuracy, 2x faster
+
+```bash
+# No-collage variant (add --no-collage --refs-per-class 3)
+python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 --model sonnet \
+  --exclude "Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus" \
+  --ref-dir CyberVisionAg/Prepared_Dataset/Soybean \
+  --test-dir CyberVisionAg/Prepared_Dataset/Soybean_test \
+  --part-index CyberVisionAg/Prepared_Dataset/Soybean/part_index.md \
+  --no-collage --refs-per-class 3
+```
+
+### Summary of all results (Soybean, Sonnet, internet KB, k=8)
+
+| Config | Accuracy | Delta vs old baseline |
+|--------|----------|-----------------------|
+| Old baseline (noisy data, old test set) | 37.0% (30/81) | -- |
+| Phase 1: cleaned data | 50.0% (37/74) | +13.0pp |
+| Phase 2: + part index | 52.7% (39/74) | +15.7pp |
+| No-collage ablation | 51.4% (38/74) | +14.4pp |
+
+Note: old baseline used 81 test images from curated dataset. Phase 1+ use 74 filtered test images from Data/Soybean. Test sets are different so deltas are approximate.
+
+### TODO
+- [ ] Attractor guide on top of prepared dataset
+- [ ] Test with Opus model on prepared dataset
+- [ ] Test on other crops (Corn, Mango)
+- [ ] Make test set comparison fair (run old test images with new refs)
+
 **Inspect tools**:
 ```bash
-# Grid image of all test images with KB descriptions
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
 ```

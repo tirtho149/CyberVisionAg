@@ -201,25 +201,38 @@ def load_dataset(
 
 def find_reference_images(
     dataset: str, classes: list[str], refs_per_class: int = 1,
+    ref_dir: Path | None = None,
 ) -> dict[str, list[str]]:
     """Find reference images per class.
 
     Args:
         refs_per_class: How many reference images per class (evenly spaced).
             1 = middle image only (legacy behavior).
+        ref_dir: Prepared dataset dir (class/part/ subfolders). Pools all parts.
 
     Returns:
         {class_name: [list_of_paths]}
     """
     ref_images = {}
     for cls in classes:
-        cls_dir = TRAIN_DIR / dataset / cls
+        if ref_dir:
+            cls_dir = ref_dir / cls
+        else:
+            cls_dir = TRAIN_DIR / dataset / cls
         if not cls_dir.exists():
             continue
-        imgs = sorted(
-            str(p) for p in cls_dir.iterdir()
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
-        )
+        if ref_dir:
+            imgs = sorted(
+                str(p) for part_dir in cls_dir.iterdir()
+                if part_dir.is_dir() and part_dir.name not in ("rejected", "test")
+                for p in part_dir.iterdir()
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            )
+        else:
+            imgs = sorted(
+                str(p) for p in cls_dir.iterdir()
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            )
         if not imgs:
             continue
         if refs_per_class >= len(imgs):
@@ -722,7 +735,7 @@ def main():
     )
     ref_dir = Path(args.ref_dir) if args.ref_dir else None
     if args.no_collage:
-        ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
+        ref_images = find_reference_images(args.dataset, classes, args.refs_per_class, ref_dir=ref_dir)
     else:
         ref_images = make_collages(args.dataset, classes, ref_dir=ref_dir)
     if ref_dir:
