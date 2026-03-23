@@ -1381,12 +1381,76 @@ Prepared_Dataset/Soybean_Diseases/
 
 **TODO (incremental)**:
 - [x] Build `prepare_dataset.py` with structured output
-- [x] Run on Soybean (5 train images/class, 135 calls, 112 matched, 23 rejected, 0 errors)
+- [x] Run on Soybean curated (5 train images/class, 135 calls, 112 matched, 23 rejected, 0 errors)
 - [x] Add reasoning log to output (`tags.csv` with per-image match/part/reason)
-- [ ] Inspect rejected images and matching reasoning for quality check
-- [ ] Run eval with prepared dataset as reference source
-- [ ] Sub-experiment: remove collage logic, use individual per-part images instead
-- [ ] Compare results: prepared vs original dataset, with and without collages
+- [x] Rename Data/Soybean classes to match curated casing (see class mapping below)
+- [x] Run on Data/Soybean (20 images/class, 538 inspected, 242 matched, 101 rejected, 194 skipped, 1 error)
+- [x] Analyze part distribution across classes (see findings below)
+
+**Data/Soybean run (seed=42)**:
+```
+Input: Data/Soybean (26 classes after exclusions, ~79 images/class)
+Output: CyberVisionAg/Prepared_Dataset/Soybean/
+Inspected: 538, Matched: 242 (45%), Rejected: 101 (19%), Skipped: 194 (quota full)
+Filename prefix filter: Soybean_Dise
+```
+
+**Class renaming** (Data/Soybean -> curated names):
+Bean_Pod_Mottle_Virus -> Bean_Pod_Mottle_virus, Downy_Mildew -> Downy_mildew,
+Frogeye_Leaf_Spot -> Frogeye_leaf_spot, Phyllosticta_Leaf_Spot -> Phyllosticta_leaf_spot,
+Septoria_Brown_Spot -> Septoria_brown_spot, Soybean_Rust -> Soybean_rust,
+Soybean_Vein_Necrosis_Virus -> Soybean_Vein_necrosis_virus,
+Sudden_Death_Syndrome -> Sudden_death_syndrome, Fusarium_Disease -> Fusarium,
+Green_Stem -> Green_stem_disorder, Damping_Off/Pythium -> Pythium_damping_off,
+Soybean_Dwarf_Mosaic_Virus_2012 -> Soybean_Dwarf_Mosaic_Virus.
+TODO: Remove filename prefix filter once class names are stable.
+
+**Excluded classes** (not in curated, no KB entry):
+Alfalfa_Mosaic_Virus, Brown_Spot, Herbicide_Injury, Iron_Deficiency_Chlorosis,
+Potassium_Deficiency, Rust, Southern_Blight, Soybean_Mosaic_Virus, Target_Spot.
+
+**Part distribution findings**:
+- leaf: 17/27 classes, pod: 11/27, stem: 11/27, whole_plant: 17/27, seed: 5/27, root: 4/27
+- root is most discriminative (only Fusarium, Phytophthora, Rhizoctonia, Soybean_Cyst_Nematode)
+- seed narrows to 5 classes (Bean_Pod_Mottle_virus, Cercospora, Phomopsis, Purple_Seed_Stain, Pythium_damping_off)
+- 5 classes are leaf-only (Bacterial_Blight, Bacterial_Pustule, Downy_mildew, Phyllosticta, Soybean_Vein_necrosis)
+
+---
+
+### Phase 1: Clean references, no part matching
+
+**Goal**: Test if removing noisy/OOD images from references improves accuracy.
+
+**Setup**:
+- Test images: `Curated_Local_Dataset/test/Soybean_Diseases/` (same as all prior experiments)
+- Reference images: `Prepared_Dataset/Soybean/` -- pool all part subfolders per class (ignore part structure)
+- Collages: made from pooled clean images
+- Prompt: same as before (no part info)
+- Config: Sonnet, internet KB, k=8, seed=42
+- Compare against: existing claude -p baseline (37.0% at same config)
+
+**Implementation**: Update `make_collages()` to accept a prepared dataset path and read from `class/*/` (all part subfolders) instead of `class/` directly.
+
+- [ ] Modify collage logic to read from prepared dataset
+- [ ] Run eval with cleaned references
+- [ ] Compare accuracy vs original references
+
+### Phase 2: Clean references + part-based filtering
+
+**Goal**: Test if matching test image plant part to reference parts improves accuracy further.
+
+**Setup**:
+- Same test images
+- Agent identifies plant part in test image (first observation)
+- Only classes that have images for that part are candidates
+- Collages made from part-specific subfolder only
+- e.g., root test image -> only 4 candidate classes, collages from root/ subfolder only
+
+**Implementation** (after Phase 1 shows results):
+- [ ] Add part detection step (agent identifies part before viewing references)
+- [ ] Filter candidate classes by part availability
+- [ ] Make part-specific collages
+- [ ] Run eval and compare vs Phase 1
 
 **First run results (Soybean, train, seed=42)**:
 ```

@@ -166,6 +166,10 @@ def main():
                         help="Max images to inspect per class (default: all)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--parallel", type=int, default=1, help="Parallel API calls")
+    parser.add_argument("--filename-prefix", default=None,
+                        help="Only process files starting with this prefix")
+    parser.add_argument("--exclude", default=None,
+                        help="Comma-separated list of class names to skip")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -173,9 +177,11 @@ def main():
     dataset = input_dir.name
 
     # Discover classes
+    user_exclude = set(args.exclude.split(",")) if args.exclude else set()
+    all_exclude = EXCLUDE | user_exclude
     classes = sorted(
         d.name for d in input_dir.iterdir()
-        if d.is_dir() and d.name not in EXCLUDE
+        if d.is_dir() and d.name not in all_exclude
     )
 
     # Load KB
@@ -203,6 +209,7 @@ def main():
         imgs = sorted(
             str(p) for p in cls_dir.iterdir()
             if p.suffix.lower() in IMAGE_EXTS
+            and (not args.filename_prefix or p.name.startswith(args.filename_prefix))
         )
 
         # Shuffle deterministically
