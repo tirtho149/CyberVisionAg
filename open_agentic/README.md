@@ -1311,3 +1311,109 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - [ ] Multiple seeds (42, 123, 456) for error bars on final numbers
 - [ ] Test on additional crops (Tomato, Wheat)
 - [x] Corn results complete with correct exclude list
+
+---
+
+## Checkpoint: Pre-March 21, 2026
+
+Everything above documents experiments for the thesis report. Results in `results/open_agentic/`. Paper in `writing/69aae430e8bdcbd9056bf911/main.tex`. Storyline in `storyline.md`.
+
+---
+
+## Phase 2: Publication-Ready Experiments (March 21+)
+
+### Experiment: Dataset Preparation via KB-Guided Filtering
+
+**Motivation**: Visual inspection of test images reveals two problems:
+1. Within-class diversity is very high (e.g., Anthracnose images span green leaves to dried dead stems)
+2. Some images may not match the KB description at all (OOD or different disease stage)
+
+This makes it hard for the agent to compare a test image against references when they show completely different presentations. The KB description says "black fruiting bodies on stems" but the reference image shows a green leaf.
+
+**Approach**: Filter and tag every image using the internet KB as ground truth.
+
+**Script**: `prepare_dataset.py`
+
+```bash
+python -m CyberVisionAg.open_agentic.prepare_dataset \
+  --input-dir CyberVisionAg/Curated_Local_Dataset/train/Soybean_Diseases \
+  --output-dir CyberVisionAg/Prepared_Dataset/Soybean_Diseases \
+  --max-per-part 5 --max-inspect-per-class 5 --seed 42 --parallel 20
+```
+
+**What it does**:
+1. For each image in each class folder, one Sonnet API call with:
+   - The image
+   - The class name
+   - The internet KB description (visual symptoms, affected parts)
+   - Structured output: `{match: yes|no, part: leaf|stem|root|pod|seed|whole_plant}`
+2. If match=yes: copy to `{class}/{part}/`
+3. If match=no: copy to `{class}/rejected/`
+4. Cap at `--max-per-part` images per terminal folder (default 5)
+
+**Output structure**:
+```
+Prepared_Dataset/Soybean_Diseases/
+  Anthracnose/
+    leaf/
+      Anthracnose_003.jpg
+    stem/
+      Anthracnose_001.jpg
+      Anthracnose_002.jpg
+    rejected/
+      Anthracnose_005.jpg
+  Bacterial_Blight/
+    leaf/
+      Bacterial_Blight_001.jpg
+      ...
+```
+
+**Implementation notes**:
+- Uses structured/JSON output from Anthropic API (check existing code in codebase for patterns)
+- Internet KB loaded from `disease_registry/outputs/{Crop}_internet.xlsx`
+- Input is a single folder (no train/test split -- keep simple)
+- Reusable for any crop by changing `--input-dir`
+
+**Logging**:
+- When a class/part hits the quota: print "Anthracnose/stem: 5/5 reached, skipping remaining"
+- At the end: print which class/parts fell short (e.g., "Anthracnose/root: 1/5 -- below quota")
+- Use `--seed` flag to shuffle image processing order deterministically (reproducible subset selection)
+
+**TODO (incremental)**:
+- [x] Build `prepare_dataset.py` with structured output
+- [x] Run on Soybean (5 train images/class, 135 calls, 112 matched, 23 rejected, 0 errors)
+- [x] Add reasoning log to output (`tags.csv` with per-image match/part/reason)
+- [ ] Inspect rejected images and matching reasoning for quality check
+- [ ] Run eval with prepared dataset as reference source
+- [ ] Sub-experiment: remove collage logic, use individual per-part images instead
+- [ ] Compare results: prepared vs original dataset, with and without collages
+
+**First run results (Soybean, train, seed=42)**:
+```
+Inspected: 135, Matched: 112 (83%), Rejected: 23 (17%), Errors: 0
+Output: CyberVisionAg/Prepared_Dataset/Soybean_Diseases/
+```
+
+Consistent classes (all images matched one part): Bacterial_Blight (leaf), Cercospora (leaf), Phomopsis (pod), Phyllosticta (leaf), Powdery_Mildew (leaf), Purple_Seed_Stain (seed).
+
+Highest rejection: Bean_Pod_Mottle_virus (3/5 rejected).
+
+**Inspect tags for a class** (to check match reasoning):
+```bash
+python -c "
+from CyberVisionAg.open_agentic.prepare_dataset import tag_image, load_kb
+from pathlib import Path
+kb = load_kb('Soybean_Diseases')
+cls = 'Anthracnose'
+for img in sorted(Path('CyberVisionAg/Curated_Local_Dataset/train/Soybean_Diseases/' + cls).glob('*.*')):
+    tag = tag_image(str(img), cls, kb[cls])
+    print(f'{img.name}: match={tag[\"match\"]}, part={tag[\"part\"]}')
+    print(f'  Reason: {tag[\"reason\"]}')
+"
+```
+
+**Inspect output with grid image**:
+```bash
+python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
+python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
+```
