@@ -152,19 +152,22 @@ def load_dataset(
     images_per_class: int | None,
     seed: int,
     exclude: set[str] | None = None,
+    test_dir_override: Path | None = None,
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """Discover classes and test images.
 
     Returns:
         (classes, test_images) where test_images is [(abs_path, ground_truth), ...]
     """
-    test_dataset_dir = TEST_DIR / dataset
+    test_dataset_dir = test_dir_override if test_dir_override else TEST_DIR / dataset
     train_dataset_dir = TRAIN_DIR / dataset
 
     if not test_dataset_dir.exists():
         sys.exit(f"ERROR: test directory not found: {test_dataset_dir}")
     if not train_dataset_dir.exists():
-        sys.exit(f"ERROR: train directory not found: {train_dataset_dir}")
+        # If using prepared dataset, train dir check is optional
+        if not test_dir_override:
+            sys.exit(f"ERROR: train directory not found: {train_dataset_dir}")
 
     # Discover all classes (folders in test dir)
     all_classes = sorted([
@@ -232,24 +235,40 @@ def find_reference_images(
 
 def make_collages(
     dataset: str, classes: list[str], n: int = 4,
+    ref_dir: Path | None = None,
 ) -> dict[str, list[str]]:
     """Create a 2×2 collage of training images per class.
 
     Returns {class_name: [collage_path]} — one collage per class,
     so it uses 1 ref budget but shows n images.
+
+    If ref_dir is provided (prepared dataset), reads from class/*/
+    (all part subfolders pooled). Otherwise reads from TRAIN_DIR/dataset/class/.
     """
     from PIL import Image
 
     collage_dir = Path(tempfile.mkdtemp(prefix="collages_"))
     ref_images = {}
     for cls in classes:
-        cls_dir = TRAIN_DIR / dataset / cls
+        if ref_dir:
+            cls_dir = ref_dir / cls
+        else:
+            cls_dir = TRAIN_DIR / dataset / cls
         if not cls_dir.exists():
             continue
-        imgs = sorted(
-            str(p) for p in cls_dir.iterdir()
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
-        )
+        # If prepared dataset (has part subfolders), pool all part images
+        if ref_dir:
+            imgs = sorted(
+                str(p) for part_dir in cls_dir.iterdir()
+                if part_dir.is_dir() and part_dir.name != "rejected"
+                for p in part_dir.iterdir()
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            )
+        else:
+            imgs = sorted(
+                str(p) for p in cls_dir.iterdir()
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            )
         if not imgs:
             continue
         # Pick n evenly spaced images
@@ -301,6 +320,7 @@ def run_single_image(
     timeout: int,
     log_dir: Path | None,
     attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
 ) -> dict:
     """Classify one test image via a claude -p agent."""
 
@@ -314,7 +334,7 @@ def run_single_image(
     try:
         result = _run_agent(
             tmp.name, ground_truth, classes, ref_images, kb_text, k, timeout,
-            attractor_guide_dir,
+            attractor_guide_dir, part_index_path,
         )
     finally:
         os.unlink(tmp.name)
@@ -347,9 +367,13 @@ def _run_agent(
     k: int | None,
     timeout: int,
     attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
 ) -> dict:
     """Spawn claude -p subprocess and parse results."""
-    system_prompt = build_system_prompt(attractor_guide_dir=attractor_guide_dir)
+    system_prompt = build_system_prompt(
+        attractor_guide_dir=attractor_guide_dir,
+        part_index_path=part_index_path,
+    )
     user_message = build_user_message(
         test_image_path, classes, ref_images, kb_text, k,
         attractor_guide_dir=attractor_guide_dir,
@@ -594,6 +618,7 @@ def run_eval(
     timeout: int,
     log_dir: Path,
     attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
 ) -> list[dict]:
     """Run evaluation on all test images with parallel dispatch."""
     results = []
@@ -606,7 +631,7 @@ def run_eval(
         t0 = time.time()
         result = run_single_image(
             img_path, gt, classes, ref_images, kb_text, k, timeout, log_dir,
-            attractor_guide_dir,
+            attractor_guide_dir, part_index_path,
         )
         elapsed = time.time() - t0
         status = "OK" if result["correct"] else "WRONG"
@@ -650,6 +675,15 @@ def main():
                         help="Shortcut: num-classes=N, images-per-class=1")
     parser.add_argument("--no-collage", action="store_true",
                         help="Use single training images instead of collages (default: collage)")
+    parser.add_argument("--ref-dir", type=str, default=None,
+                        help="Prepared dataset dir for references (e.g., Prepared_Dataset/Soybean). "
+                             "Reads from class/part/ subfolders, pools all parts.")
+    parser.add_argument("--test-dir", type=str, default=None,
+                        help="Override test image directory (e.g., Prepared_Dataset/Soybean_test). "
+                             "Expects class/img.jpg structure.")
+    parser.add_argument("--part-index", type=str, default=None,
+                        help="Path to part_index.md file. Agent reads it to narrow candidates "
+                             "by plant part (e.g., Prepared_Dataset/Soybean/part_index.md).")
     parser.add_argument("--refs-per-class", type=int, default=1,
                         help="Reference images per class (default: 1, max: 5)")
     parser.add_argument("--k", type=int, default=None,
@@ -683,12 +717,16 @@ def main():
 
     # Load dataset
     classes, test_images = load_dataset(
-        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
+        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude,
+        Path(args.test_dir) if args.test_dir else None,
     )
+    ref_dir = Path(args.ref_dir) if args.ref_dir else None
     if args.no_collage:
         ref_images = find_reference_images(args.dataset, classes, args.refs_per_class)
     else:
-        ref_images = make_collages(args.dataset, classes)
+        ref_images = make_collages(args.dataset, classes, ref_dir=ref_dir)
+    if ref_dir:
+        print(f"  Ref source: {ref_dir}")
 
     # Load KB
     if args.kb_file:
@@ -750,10 +788,20 @@ def main():
             print(f"  WARNING: attractor guide dir not found: {cg}")
 
     # Run
+    # Resolve part index
+    part_index_path = None
+    if args.part_index:
+        pi = Path(args.part_index)
+        if pi.exists():
+            part_index_path = str(pi.resolve())
+            print(f"  Part index: {part_index_path}")
+        else:
+            print(f"  WARNING: part index not found: {pi}")
+
     results = run_eval(
         classes, test_images, ref_images, kb_text,
         args.k, args.parallel, args.timeout, log_dir,
-        attractor_guide_dir,
+        attractor_guide_dir, part_index_path,
     )
 
     # Metrics

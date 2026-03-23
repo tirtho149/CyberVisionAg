@@ -1,30 +1,46 @@
 """Prompt construction for the open agentic pipeline."""
 
 
-def build_system_prompt(attractor_guide_dir: str | None = None) -> str:
+def build_system_prompt(
+    attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
+) -> str:
     """Short role-setting system prompt appended to Claude Code defaults."""
     steps = (
         "You are an expert plant pathologist classifying a diseased plant image.\n\n"
         "## Strategy\n"
         "1. Read the test image first. Note the affected plant part (leaf, stem, pod, "
         "root, whole plant) and key visual features (color, shape, pattern, texture).\n"
-        "2. Review the symptom descriptions below to narrow candidates -- identify "
-        "classes whose descriptions match your visual observations.\n"
-        "3. View reference images for your top candidates (use your full budget). "
-        "Compare carefully -- look for the specific feature that distinguishes each.\n"
     )
+
+    if part_index_path:
+        steps += (
+            f"2. Read the part index file `{part_index_path}` and find the plant part "
+            "you identified. This narrows the candidate classes to only those that "
+            "affect that part. Focus on these candidates.\n"
+            "3. Review the symptom descriptions below to narrow further.\n"
+            "4. View reference images for your top candidates (use your full budget). "
+            "Compare carefully -- look for the specific feature that distinguishes each.\n"
+        )
+    else:
+        steps += (
+            "2. Review the symptom descriptions below to narrow candidates -- identify "
+            "classes whose descriptions match your visual observations.\n"
+            "3. View reference images for your top candidates (use your full budget). "
+            "Compare carefully -- look for the specific feature that distinguishes each.\n"
+        )
 
     if attractor_guide_dir:
         steps += (
-            "4. State your initial prediction.\n"
-            "5. Check if your prediction is a known attractor by reading "
+            "- State your initial prediction.\n"
+            "- Check if your prediction is a known attractor by reading "
             f"`{attractor_guide_dir}/{{your_prediction}}.md`. "
             "If the file exists, it lists alternatives -- view their references "
             "before confirming. If the file does not exist, your prediction is fine.\n"
-            "6. Submit your final prediction.\n\n"
+            "- Submit your final prediction.\n\n"
         )
     else:
-        steps += "4. Submit your prediction.\n\n"
+        steps += "- Submit your prediction.\n\n"
 
     steps += (
         "End your response with exactly this JSON block:\n"

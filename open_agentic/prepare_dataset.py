@@ -161,7 +161,9 @@ def main():
     parser = argparse.ArgumentParser(description="Filter and tag dataset images using KB")
     parser.add_argument("--input-dir", required=True, help="Source folder with class subfolders")
     parser.add_argument("--output-dir", required=True, help="Destination folder")
-    parser.add_argument("--max-per-part", type=int, default=5, help="Max images per class/part")
+    parser.add_argument("--max-per-part", type=int, default=5, help="Max reference images per class/part")
+    parser.add_argument("--test-per-class", type=int, default=0,
+                        help="Max test images per class (0=no test split). Saved to {output-dir}_test/class/.")
     parser.add_argument("--max-inspect-per-class", type=int, default=None,
                         help="Max images to inspect per class (default: all)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
@@ -189,20 +191,23 @@ def main():
     print(f"Dataset: {dataset}")
     print(f"Classes: {len(classes)}")
     print(f"KB entries: {len(kb)}")
-    print(f"Max per part: {args.max_per_part}")
+    print(f"Max ref per part: {args.max_per_part}")
+    print(f"Max test per class: {args.test_per_class}")
     print(f"Max inspect per class: {args.max_inspect_per_class or 'all'}")
     print(f"Seed: {args.seed}")
     print(f"Parallel: {args.parallel}")
     print()
 
-    # Track quotas: {class: {part: count}}
-    quotas = defaultdict(lambda: defaultdict(int))
-    total_matched = 0
+    # Track quotas
+    ref_quotas = defaultdict(lambda: defaultdict(int))  # {class: {part: count}}
+    test_counts = defaultdict(int)  # {class: count}
+    total_ref = 0
+    total_test = 0
     total_rejected = 0
     total_skipped = 0
     total_inspected = 0
     errors = []
-    all_tags = []  # (class, filename, match, part, reason)
+    all_tags = []  # (class, filename, match, part, split, reason)
 
     for cls in classes:
         cls_dir = input_dir / cls
@@ -257,30 +262,46 @@ def main():
                 continue
 
             part = tag["part"]
-            all_tags.append((cls, fname, tag["match"], part, tag["reason"]))
 
             if tag["match"] == "yes":
-                if quotas[cls][part] >= args.max_per_part:
+                if ref_quotas[cls][part] < args.max_per_part:
+                    # Reference slot (organized by part)
+                    dest = output_dir / cls / part
+                    dest.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(img_path, dest / fname)
+                    ref_quotas[cls][part] += 1
+                    total_ref += 1
+                    split = "ref"
+                    if ref_quotas[cls][part] == args.max_per_part:
+                        print(f"    {cls}/{part}: {args.max_per_part}/{args.max_per_part} reached")
+                elif args.test_per_class > 0 and test_counts[cls] < args.test_per_class:
+                    # Test slot (separate folder: {output_dir}_test/class/)
+                    test_dir = Path(str(output_dir) + "_test")
+                    dest = test_dir / cls
+                    dest.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(img_path, dest / fname)
+                    test_counts[cls] += 1
+                    total_test += 1
+                    split = "test"
+                    if test_counts[cls] == args.test_per_class:
+                        print(f"    {cls}/test: {args.test_per_class}/{args.test_per_class} reached")
+                else:
                     total_skipped += 1
-                    continue
-                dest = output_dir / cls / part
-                dest.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(img_path, dest / fname)
-                quotas[cls][part] += 1
-                total_matched += 1
-
-                if quotas[cls][part] == args.max_per_part:
-                    print(f"    {cls}/{part}: {args.max_per_part}/{args.max_per_part} reached")
+                    split = "skipped"
             else:
                 dest = output_dir / cls / "rejected"
                 dest.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(img_path, dest / fname)
                 total_rejected += 1
+                split = "rejected"
+
+            all_tags.append((cls, fname, tag["match"], part, split, tag["reason"]))
 
     # Summary
     print(f"\n{'='*60}")
     print(f"Inspected: {total_inspected}")
-    print(f"Matched:   {total_matched}")
+    print(f"Reference: {total_ref}")
+    print(f"Test:      {total_test}")
     print(f"Rejected:  {total_rejected}")
     print(f"Skipped:   {total_skipped} (quota full)")
     print(f"Errors:    {len(errors)}")
@@ -290,29 +311,40 @@ def main():
         for cls, fname, err in errors:
             print(f"  {cls}/{fname}: {err[:100]}")
 
-    # Report below-quota class/parts
-    print(f"\nBelow quota ({args.max_per_part}):")
+    # Report below-quota class/parts (references)
+    print(f"\nBelow ref quota ({args.max_per_part}):")
     any_below = False
     for cls in classes:
-        for part in sorted(quotas[cls]):
-            count = quotas[cls][part]
+        for part in sorted(ref_quotas[cls]):
+            count = ref_quotas[cls][part]
             if count < args.max_per_part:
                 print(f"  {cls}/{part}: {count}/{args.max_per_part}")
                 any_below = True
     if not any_below:
-        print("  None -- all class/parts met quota")
+        print("  None -- all class/parts met ref quota")
 
-    empty = [cls for cls in classes if not quotas[cls]]
+    if args.test_per_class > 0:
+        print(f"\nBelow test quota ({args.test_per_class}):")
+        any_below_test = False
+        for cls in classes:
+            count = test_counts[cls]
+            if count < args.test_per_class:
+                print(f"  {cls}: {count}/{args.test_per_class}")
+                any_below_test = True
+        if not any_below_test:
+            print("  None -- all classes met test quota")
+
+    empty = [cls for cls in classes if not ref_quotas[cls]]
     if empty:
         print(f"\nClasses with zero matched images: {empty}")
 
     # Save reasoning log
     tags_path = output_dir / "tags.csv"
     with open(tags_path, "w") as f:
-        f.write("class,filename,match,part,reason\n")
-        for cls_name, fname, match, part, reason in all_tags:
+        f.write("class,filename,match,part,split,reason\n")
+        for cls_name, fname, match, part, split, reason in all_tags:
             reason_clean = reason.replace('"', "'").replace(",", ";")
-            f.write(f'{cls_name},{fname},{match},{part},"{reason_clean}"\n')
+            f.write(f'{cls_name},{fname},{match},{part},{split},"{reason_clean}"\n')
     print(f"Tags log saved: {tags_path}")
 
     # Save metadata
@@ -320,14 +352,17 @@ def main():
         "dataset": dataset,
         "seed": args.seed,
         "max_per_part": args.max_per_part,
+        "test_per_class": args.test_per_class,
         "max_inspect_per_class": args.max_inspect_per_class,
         "classes": len(classes),
         "total_inspected": total_inspected,
-        "total_matched": total_matched,
+        "total_ref": total_ref,
+        "total_test": total_test,
         "total_rejected": total_rejected,
         "total_skipped": total_skipped,
         "errors": len(errors),
-        "quotas": {cls: dict(quotas[cls]) for cls in classes},
+        "ref_quotas": {cls: dict(ref_quotas[cls]) for cls in classes},
+        "test_counts": {cls: test_counts[cls] for cls in classes},
     }
     meta_path = output_dir / "metadata.json"
     meta_path.parent.mkdir(parents=True, exist_ok=True)

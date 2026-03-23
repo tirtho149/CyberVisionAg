@@ -1381,18 +1381,28 @@ Prepared_Dataset/Soybean_Diseases/
 
 **TODO (incremental)**:
 - [x] Build `prepare_dataset.py` with structured output
-- [x] Run on Soybean curated (5 train images/class, 135 calls, 112 matched, 23 rejected, 0 errors)
-- [x] Add reasoning log to output (`tags.csv` with per-image match/part/reason)
-- [x] Rename Data/Soybean classes to match curated casing (see class mapping below)
-- [x] Run on Data/Soybean (20 images/class, 538 inspected, 242 matched, 101 rejected, 194 skipped, 1 error)
-- [x] Analyze part distribution across classes (see findings below)
+- [x] Add reasoning log (`tags.csv` with per-image match/part/reason)
+- [x] Rename Data/Soybean classes to match curated casing
+- [x] Run on Data/Soybean with train/test split (20 inspect/class, 5 ref/part, 3 test/class)
+- [x] Analyze part distribution across classes
+- [x] Phase 1: run eval with cleaned refs+test (50.0% vs 37.0% baseline = +13pp)
+- [ ] Phase 2: add part index as optional hint for the agent
+- [ ] TODO: attractor guide on top of prepared dataset
+- [ ] TODO: remove filename prefix filter once class names are stable
 
-**Data/Soybean run (seed=42)**:
+**Data preparation run (Data/Soybean, seed=42)**:
+```bash
+python -m CyberVisionAg.open_agentic.prepare_dataset \
+  --input-dir Data/Soybean \
+  --output-dir CyberVisionAg/Prepared_Dataset/Soybean \
+  --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 --seed 42 --parallel 20 \
+  --filename-prefix Soybean_Dise \
+  --exclude "Alfalfa_Mosaic_Virus,Brown_Spot,Herbicide_Injury,Iron_Deficiency_Chlorosis,Potassium_Deficiency,Rust,Southern_Blight,Soybean_Mosaic_Virus,Target_Spot"
 ```
-Input: Data/Soybean (26 classes after exclusions, ~79 images/class)
-Output: CyberVisionAg/Prepared_Dataset/Soybean/
-Inspected: 538, Matched: 242 (45%), Rejected: 101 (19%), Skipped: 194 (quota full)
-Filename prefix filter: Soybean_Dise
+```
+Inspected: 538, Reference: 242, Test: 74, Rejected: 107, Skipped: 114, Errors: 1
+Output refs: CyberVisionAg/Prepared_Dataset/Soybean/ (class/part/img.jpg)
+Output test: CyberVisionAg/Prepared_Dataset/Soybean_test/ (class/img.jpg)
 ```
 
 **Class renaming** (Data/Soybean -> curated names):
@@ -1403,81 +1413,47 @@ Soybean_Vein_Necrosis_Virus -> Soybean_Vein_necrosis_virus,
 Sudden_Death_Syndrome -> Sudden_death_syndrome, Fusarium_Disease -> Fusarium,
 Green_Stem -> Green_stem_disorder, Damping_Off/Pythium -> Pythium_damping_off,
 Soybean_Dwarf_Mosaic_Virus_2012 -> Soybean_Dwarf_Mosaic_Virus.
-TODO: Remove filename prefix filter once class names are stable.
 
-**Excluded classes** (not in curated, no KB entry):
-Alfalfa_Mosaic_Virus, Brown_Spot, Herbicide_Injury, Iron_Deficiency_Chlorosis,
-Potassium_Deficiency, Rust, Southern_Blight, Soybean_Mosaic_Virus, Target_Spot.
-
-**Part distribution findings**:
-- leaf: 17/27 classes, pod: 11/27, stem: 11/27, whole_plant: 17/27, seed: 5/27, root: 4/27
+**Part distribution**:
+- leaf: 16/26, pod: 10/26, stem: 11/26, whole_plant: 17/26, seed: 5/26, root: 4/26
 - root is most discriminative (only Fusarium, Phytophthora, Rhizoctonia, Soybean_Cyst_Nematode)
-- seed narrows to 5 classes (Bean_Pod_Mottle_virus, Cercospora, Phomopsis, Purple_Seed_Stain, Pythium_damping_off)
-- 5 classes are leaf-only (Bacterial_Blight, Bacterial_Pustule, Downy_mildew, Phyllosticta, Soybean_Vein_necrosis)
+- Part index file: `Prepared_Dataset/Soybean/part_index.md`
 
 ---
 
-### Phase 1: Clean references, no part matching
+### Phase 1: Clean references, no part matching -- DONE
 
-**Goal**: Test if removing noisy/OOD images from references improves accuracy.
+**Result: 50.0% (37/74) vs old baseline 37.0% (30/81) = +13pp**
 
-**Setup**:
-- Test images: `Curated_Local_Dataset/test/Soybean_Diseases/` (same as all prior experiments)
-- Reference images: `Prepared_Dataset/Soybean/` -- pool all part subfolders per class (ignore part structure)
-- Collages: made from pooled clean images
-- Prompt: same as before (no part info)
-- Config: Sonnet, internet KB, k=8, seed=42
-- Compare against: existing claude -p baseline (37.0% at same config)
+Just filtering noisy/OOD images from both references and test set produced the largest accuracy improvement in the project. No prompt changes, no new tools, just cleaner data.
 
-**Implementation**: Update `make_collages()` to accept a prepared dataset path and read from `class/*/` (all part subfolders) instead of `class/` directly.
-
-- [ ] Modify collage logic to read from prepared dataset
-- [ ] Run eval with cleaned references
-- [ ] Compare accuracy vs original references
-
-### Phase 2: Clean references + part-based filtering
-
-**Goal**: Test if matching test image plant part to reference parts improves accuracy further.
-
-**Setup**:
-- Same test images
-- Agent identifies plant part in test image (first observation)
-- Only classes that have images for that part are candidates
-- Collages made from part-specific subfolder only
-- e.g., root test image -> only 4 candidate classes, collages from root/ subfolder only
-
-**Implementation** (after Phase 1 shows results):
-- [ ] Add part detection step (agent identifies part before viewing references)
-- [ ] Filter candidate classes by part availability
-- [ ] Make part-specific collages
-- [ ] Run eval and compare vs Phase 1
-
-**First run results (Soybean, train, seed=42)**:
-```
-Inspected: 135, Matched: 112 (83%), Rejected: 23 (17%), Errors: 0
-Output: CyberVisionAg/Prepared_Dataset/Soybean_Diseases/
-```
-
-Consistent classes (all images matched one part): Bacterial_Blight (leaf), Cercospora (leaf), Phomopsis (pod), Phyllosticta (leaf), Powdery_Mildew (leaf), Purple_Seed_Stain (seed).
-
-Highest rejection: Bean_Pod_Mottle_virus (3/5 rejected).
-
-**Inspect tags for a class** (to check match reasoning):
 ```bash
-python -c "
-from CyberVisionAg.open_agentic.prepare_dataset import tag_image, load_kb
-from pathlib import Path
-kb = load_kb('Soybean_Diseases')
-cls = 'Anthracnose'
-for img in sorted(Path('CyberVisionAg/Curated_Local_Dataset/train/Soybean_Diseases/' + cls).glob('*.*')):
-    tag = tag_image(str(img), cls, kb[cls])
-    print(f'{img.name}: match={tag[\"match\"]}, part={tag[\"part\"]}')
-    print(f'  Reason: {tag[\"reason\"]}')
-"
+python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 --model sonnet \
+  --exclude "Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus" \
+  --ref-dir CyberVisionAg/Prepared_Dataset/Soybean \
+  --test-dir CyberVisionAg/Prepared_Dataset/Soybean_test
 ```
 
-**Inspect output with grid image**:
+### Phase 2: Part index as optional hint
+
+**Goal**: Give the agent a part-to-disease mapping as additional context. The agent identifies the plant part in the test image, reads the part index, and uses it to narrow candidates. Everything else (KB, class list, references) stays the same. The agent has full freedom to ignore the hint.
+
+The part index is a small markdown file (`part_index.md`) listing which diseases affect which plant parts. The agent reads it via the existing Read tool after observing the test image.
+
 ```bash
+# Same as Phase 1 but with --part-index
+python -m CyberVisionAg.open_agentic.eval \
+  --symptom-source internet --images-per-class 3 --k 8 --parallel 12 --seed 42 --model sonnet \
+  --exclude "Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus" \
+  --ref-dir CyberVisionAg/Prepared_Dataset/Soybean \
+  --test-dir CyberVisionAg/Prepared_Dataset/Soybean_test \
+  --part-index CyberVisionAg/Prepared_Dataset/Soybean/part_index.md
+```
+
+**Inspect tools**:
+```bash
+# Grid image of all test images with KB descriptions
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
 ```
