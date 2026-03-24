@@ -45,9 +45,10 @@ Respond with JSON only (no markdown, no preamble):
 
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
-def load_dataset(dataset, num_classes, images_per_class, seed, exclude=None):
+def load_dataset(dataset, num_classes, images_per_class, seed, exclude=None,
+                  test_dir_override=None):
     """Discover test classes and images (same logic as eval.py)."""
-    test_dir = TEST_DIR / dataset
+    test_dir = test_dir_override or (TEST_DIR / dataset)
     if not test_dir.exists():
         sys.exit(f"ERROR: {test_dir} not found")
 
@@ -77,15 +78,23 @@ def load_dataset(dataset, num_classes, images_per_class, seed, exclude=None):
     return classes, test_images
 
 
-def collect_train_pool(dataset, classes):
-    """Collect all training images for the given classes."""
+def collect_train_pool(dataset, classes, ref_dir=None):
+    """Collect all training images for the given classes.
+
+    If ref_dir is provided, collects from class/part/ subfolders (prepared dataset).
+    Otherwise uses the default TRAIN_DIR/dataset/class/ structure.
+    """
     pool = []
     for cls in classes:
-        cls_dir = TRAIN_DIR / dataset / cls
+        if ref_dir:
+            cls_dir = ref_dir / cls
+        else:
+            cls_dir = TRAIN_DIR / dataset / cls
         if not cls_dir.exists():
             continue
-        for img in sorted(cls_dir.iterdir()):
-            if img.suffix.lower() in IMAGE_EXTS:
+        # Walk all subdirs (handles both flat and part-based structures)
+        for img in sorted(cls_dir.rglob("*")):
+            if img.is_file() and img.suffix.lower() in IMAGE_EXTS and "rejected" not in img.parts:
                 pool.append((str(img), cls))
     return pool
 
@@ -200,6 +209,10 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--exclude", type=str, default=None,
                         help="Comma-separated class names to exclude")
+    parser.add_argument("--ref-dir", type=str, default=None,
+                        help="Prepared dataset dir for references (e.g., Prepared_Dataset/Soybean)")
+    parser.add_argument("--test-dir", type=str, default=None,
+                        help="Override test image directory (e.g., Prepared_Dataset/Soybean_test)")
     args = parser.parse_args()
 
     if args.quick_test:
@@ -208,10 +221,14 @@ def main():
 
     exclude = set(args.exclude.split(",")) if args.exclude else None
 
+    test_dir_override = Path(args.test_dir) if args.test_dir else None
+    ref_dir = Path(args.ref_dir) if args.ref_dir else None
+
     classes, test_images = load_dataset(
-        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude
+        args.dataset, args.num_classes, args.images_per_class, args.seed, exclude,
+        test_dir_override,
     )
-    train_pool = collect_train_pool(args.dataset, classes)
+    train_pool = collect_train_pool(args.dataset, classes, ref_dir=ref_dir)
 
     print("FEW-SHOT BASELINE (single API call, no tools, no KB)")
     print(f"  Model         : {MODEL}")

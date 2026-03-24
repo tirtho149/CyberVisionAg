@@ -199,9 +199,33 @@ def load_dataset(
     return classes, test_images
 
 
+def _ensure_merged_refs(ref_dir: Path, classes: list[str]) -> None:
+    """Create merged/ folders by copying images from part subfolders (except rejected/).
+
+    Runs once per eval. Skips classes where merged/ already has images.
+    """
+    for cls in classes:
+        cls_dir = ref_dir / cls
+        if not cls_dir.exists():
+            continue
+        merged_dir = cls_dir / "merged"
+        # Skip if merged already has images
+        if merged_dir.exists() and any(merged_dir.glob("*.jpg")) or any(merged_dir.glob("*.png")):
+            continue
+        merged_dir.mkdir(exist_ok=True)
+        for part_dir in cls_dir.iterdir():
+            if not part_dir.is_dir() or part_dir.name in ("rejected", "test", "merged"):
+                continue
+            for img in part_dir.iterdir():
+                if img.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+                    dest = merged_dir / img.name
+                    if not dest.exists():
+                        shutil.copy2(img, dest)
+
+
 def find_reference_images(
     dataset: str, classes: list[str], refs_per_class: int = 1,
-    ref_dir: Path | None = None,
+    ref_dir: Path | None = None, use_parts: bool = True,
 ) -> dict[str, list[str]]:
     """Find reference images per class.
 
@@ -209,6 +233,8 @@ def find_reference_images(
         refs_per_class: How many reference images per class (evenly spaced).
             1 = middle image only (legacy behavior).
         ref_dir: Prepared dataset dir (class/part/ subfolders). Pools all parts.
+        use_parts: If True, read from class/part/ subfolders (part info in path).
+            If False, read from class/merged/ (no part info in path).
 
     Returns:
         {class_name: [list_of_paths]}
@@ -221,10 +247,17 @@ def find_reference_images(
             cls_dir = TRAIN_DIR / dataset / cls
         if not cls_dir.exists():
             continue
-        if ref_dir:
+        if ref_dir and not use_parts:
+            # Read from merged/ (flat, no part info in path)
+            merged_dir = cls_dir / "merged"
+            imgs = sorted(
+                str(p) for p in merged_dir.iterdir()
+                if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            ) if merged_dir.exists() else []
+        elif ref_dir:
             imgs = sorted(
                 str(p) for part_dir in cls_dir.iterdir()
-                if part_dir.is_dir() and part_dir.name not in ("rejected", "test")
+                if part_dir.is_dir() and part_dir.name not in ("rejected", "test", "merged")
                 for p in part_dir.iterdir()
                 if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
             )
@@ -273,7 +306,7 @@ def make_collages(
         if ref_dir:
             imgs = sorted(
                 str(p) for part_dir in cls_dir.iterdir()
-                if part_dir.is_dir() and part_dir.name != "rejected"
+                if part_dir.is_dir() and part_dir.name not in ("rejected", "test", "merged")
                 for p in part_dir.iterdir()
                 if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
             )
@@ -356,7 +389,9 @@ def run_single_image(
     if log_dir:
         log_dir.mkdir(parents=True, exist_ok=True)
         img_name = Path(test_image).stem
-        log_file = log_dir / f"{img_name}.json"
+        # Include class name to avoid collisions (e.g., Soybean_Dise_10 in multiple classes)
+        log_name = f"{ground_truth}__{img_name}"
+        log_file = log_dir / f"{log_name}.json"
         trace = result.pop("trace", [])
         with open(log_file, "w") as f:
             json.dump(result, f, indent=2)
@@ -364,7 +399,7 @@ def run_single_image(
         if trace:
             trace_dir = log_dir / "traces"
             trace_dir.mkdir(exist_ok=True)
-            with open(trace_dir / f"{img_name}.json", "w") as f:
+            with open(trace_dir / f"{log_name}.json", "w") as f:
                 json.dump(trace, f, indent=2)
         result["trace"] = trace  # restore for in-memory use
 
@@ -386,6 +421,7 @@ def _run_agent(
     system_prompt = build_system_prompt(
         attractor_guide_dir=attractor_guide_dir,
         part_index_path=part_index_path,
+        k=k,
     )
     user_message = build_user_message(
         test_image_path, classes, ref_images, kb_text, k,
@@ -549,10 +585,9 @@ def _count_ref_reads(trace: list[dict], test_image: str) -> int:
         file_path = entry.get("input", {}).get("file_path", "")
         if file_path == test_image:
             continue
-        # Reference images: in train dir OR collage temp dir
+        # Any image that isn't the test image is a reference
         if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-            if "train" in file_path or "collage" in file_path:
-                count += 1
+            count += 1
     return count
 
 
@@ -734,12 +769,18 @@ def main():
         Path(args.test_dir) if args.test_dir else None,
     )
     ref_dir = Path(args.ref_dir) if args.ref_dir else None
+    # No-KB uses merged/ refs (no part info in path); KB uses part/ subfolders
+    has_kb = args.symptom_source != "none" or args.kb_file
+    use_parts = has_kb
+    if ref_dir and not use_parts:
+        _ensure_merged_refs(ref_dir, classes)
     if args.no_collage:
-        ref_images = find_reference_images(args.dataset, classes, args.refs_per_class, ref_dir=ref_dir)
+        ref_images = find_reference_images(args.dataset, classes, args.refs_per_class,
+                                           ref_dir=ref_dir, use_parts=use_parts)
     else:
         ref_images = make_collages(args.dataset, classes, ref_dir=ref_dir)
     if ref_dir:
-        print(f"  Ref source: {ref_dir}")
+        print(f"  Ref source: {ref_dir} ({'parts' if use_parts else 'merged'})")
 
     # Load KB
     if args.kb_file:

@@ -34,11 +34,20 @@ CROP="${2:-}"
 
 # ── Crop-specific settings ────────────────────────────────────────────────────
 setup_crop() {
+    # Prepared dataset paths (empty = use default Curated_Local_Dataset)
+    REF_DIR=""
+    TEST_DIR=""
+    PART_INDEX=""
+
     case "${CROP}" in
         soybean)
             DATASET="Soybean_Diseases"
-            EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
-            KB_SOURCES=("none" "local" "internet")
+            EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus"
+            KB_SOURCES=("none" "internet")
+            # KB_SOURCES=("none" "local" "internet")  # local commented out: not needed for paper
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Soybean"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Soybean_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Soybean/part_index.md"
             ;;
         corn)
             DATASET="Corn_Diseases"
@@ -98,12 +107,19 @@ FEWSHOT_K_VALUES=(0 1 4 8 16)
 run_single() {
     local model="$1" src="$2" k="$3"
     echo -n "  ${model} | ${src} | k=${k}: "
+    local extra_flags=""
+    [ -n "${REF_DIR}" ] && extra_flags+=" --ref-dir ${REF_DIR}"
+    [ -n "${TEST_DIR}" ] && extra_flags+=" --test-dir ${TEST_DIR}"
+    # Part index only when KB is present (it's derived from KB-guided filtering)
+    [ -n "${PART_INDEX}" ] && [ "${src}" != "none" ] && extra_flags+=" --part-index ${PART_INDEX}"
     OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
         --model "${model}" --symptom-source "${src}" \
         --dataset "${DATASET}" \
         --images-per-class "${IMAGES}" --k "${k}" \
         --parallel "${PARALLEL}" --seed "${SEED}" \
-        --exclude "${EXCLUDE}" 2>&1) || true
+        --exclude "${EXCLUDE}" \
+        --no-collage --refs-per-class 3 \
+        ${extra_flags} 2>&1) || true
 
     acc=$(echo "${OUTPUT}" | grep "Accuracy" | head -1 | sed 's/.*: *//')
     refs=$(echo "${OUTPUT}" | grep "Avg refs" | head -1 | sed 's/.*: *//')
@@ -115,11 +131,14 @@ run_single() {
 run_fewshot() {
     local k="$1"
     echo -n "  few-shot | k=${k}: "
+    local extra_flags=""
+    [ -n "${REF_DIR}" ] && extra_flags+=" --ref-dir ${REF_DIR}"
+    [ -n "${TEST_DIR}" ] && extra_flags+=" --test-dir ${TEST_DIR}"
     OUTPUT=$(PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.few_shot \
         --dataset "${DATASET}" \
         --images-per-class "${IMAGES}" --k "${k}" \
         --parallel "${PARALLEL}" --seed "${SEED}" \
-        --exclude "${EXCLUDE}" 2>&1) || true
+        --exclude "${EXCLUDE}" ${extra_flags} 2>&1) || true
 
     acc=$(echo "${OUTPUT}" | grep "Accuracy" | head -1 | sed 's/.*: *//')
     cost=$(echo "${OUTPUT}" | grep "Total cost" | head -1 | sed 's/.*: *//')

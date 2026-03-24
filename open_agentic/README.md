@@ -1476,25 +1476,54 @@ python -m CyberVisionAg.open_agentic.eval \
   --no-collage --refs-per-class 3
 ```
 
-### Summary of all results (Soybean, Sonnet, internet KB, k=8)
+### Results so far (Soybean, 25 classes, 74 test images, prepared dataset)
 
-| Config | Accuracy | Delta vs old baseline |
-|--------|----------|-----------------------|
-| Old baseline (noisy data, old test set) | 37.0% (30/81) | -- |
-| Phase 1: cleaned data | 50.0% (37/74) | +13.0pp |
-| Phase 2: + part index | 52.7% (39/74) | +15.7pp |
-| No-collage ablation | 51.4% (38/74) | +14.4pp |
+| Method | KB | k | Accuracy | Notes |
+|--------|-----|---|----------|-------|
+| Few-shot baseline | none | 4 | 40.5% (30/74) | Single API call, no tools |
+| Agentic | internet | 4 | 50.0% (37/74) | + part index |
+| Agentic | internet | 8 | 51.4% (38/74) | + part index |
+| Agentic (Phase 2) | internet | 8 | 52.7% (39/74) | + part index, collage |
 
-Note: old baseline used 81 test images from curated dataset. Phase 1+ use 74 filtered test images from Data/Soybean. Test sets are different so deltas are approximate.
+Few-shot vs Agentic (k=4, head-to-head): Agentic wins 7 classes, few-shot wins 4, tied 14. Agentic gains are larger (+67pp swings) than few-shot wins (-33pp).
+
+### Running the full sweep
+
+`run_sweeps.sh` runs all configs for a crop and prints paper tables.
+
+```bash
+cd /Users/muhammadarbabarshad/build2026-local/AgCrawler
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
+set -a && source .env && set +a
+
+# Check what's done vs missing
+bash CyberVisionAg/open_agentic/run_sweeps.sh status soybean
+
+# Run only missing configs (resumable)
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing soybean
+
+# Print paper tables from stored results
+bash CyberVisionAg/open_agentic/run_sweeps.sh results soybean
+```
+
+**Sweep configs** (per crop):
+- Agentic: sonnet x {none, local, internet} x {k=0,1,4,8,16} + haiku/opus at internet/k=8
+- Few-shot: k={0,1,4,8,16}
+- Total: 22 configs per crop
+
+For soybean, the sweep automatically uses the prepared dataset (`--ref-dir`, `--test-dir`, `--part-index`). Other crops use default Curated_Local_Dataset until prepared datasets are built.
+
+**Current status** (2026-03-23): 2/22 soybean configs done (internet/sonnet/k4, internet/sonnet/k8). Few-shot k=4 done separately. 20 configs remaining.
 
 ### TODO
-- [ ] Attractor guide on top of prepared dataset
-- [ ] Test with Opus model on prepared dataset
-- [ ] Test on other crops (Corn, Mango)
-- [ ] Make test set comparison fair (run old test images with new refs)
+- [ ] Run full soybean sweep (`run-missing soybean`)
+- [ ] Prepare Corn and Tomato datasets (`prepare_dataset.py`)
+- [ ] Run sweeps for Corn and Tomato
+- [ ] Generate paper tables and figures
 
-**Inspect tools**:
+### Utilities
 ```bash
+# Visual inspection grid
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
 ```
