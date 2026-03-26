@@ -51,13 +51,19 @@ setup_crop() {
             ;;
         corn)
             DATASET="Corn_Diseases"
-            EXCLUDE="Head_smut_South_Africa,Stewarts_disease,Misc,Multiple_foliar_diseases,General_Mixed_Stalk_Rots,Ear_rots_General_Mixed,Genetic_flecking_striping"
+            EXCLUDE="Anthracnose_Ear_Infection,Leaf_Blight,Leaf_Spot,Maize_Lethal_Necrosis,Penicillium_On_Seedling,Pythium,Rhizoctonia,Rust,Smut,Ear_Rots,General_And_Mixed_Ear_Rots,General_And_Mixed_Stalk_Rots,Genetic_Flecking_Or_Striping,Genetic_Streaking,Diplodia,Chocolate_Spot,Barley_Yellow_Dwarf_Virus,Cladosporium_Ear_Rot,Crown_Rot,Damping_Off,Downy_Mildew,Maize_White_Line_Mosaic,Nigrospora_Ear_Rot,Penicillium_Ear_Rot,Pythium_Stalk_Rot,Rhizopus_Stolonifer,Root_Rot,Trichoderma_Stalk_Rot"
             KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Corn"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Corn_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Corn/part_index.md"
             ;;
         mango)
             DATASET="Mango_Leaf_Disease"
-            EXCLUDE=""
+            EXCLUDE="Bacterial_Canker"
             KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Mango"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Mango_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango/part_index.md"
             ;;
         tomato)
             DATASET="Tomato_Diseases"

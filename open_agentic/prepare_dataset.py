@@ -58,7 +58,7 @@ TAG_SCHEMA = {
 
 def load_kb(dataset: str) -> dict[str, str]:
     """Load KB descriptions from internet xlsx."""
-    crop = dataset.replace("_Diseases", "").replace("_Disease", "").replace("_Leaf", "")
+    crop = dataset.replace("_Diseases", "").replace("_Disease", "")
     for name in [crop, crop.capitalize(), crop.lower()]:
         path = REGISTRY_OUTPUTS / f"{name}_internet.xlsx"
         if path.exists():

@@ -55,7 +55,7 @@ def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -
         return _extract_crop_section(SYMPTOMS_FILE, dataset_name)
 
     # local or internet → read from xlsx
-    crop = dataset_name.split("_")[0]  # "Soybean_Diseases" → "Soybean"
+    crop = dataset_name.replace("_Diseases", "").replace("_Disease", "")
     xlsx_path = REGISTRY_OUTPUTS / f"{crop}_{symptom_source}.xlsx"
     if not xlsx_path.exists():
         print(f"  WARNING: {xlsx_path} not found, proceeding without KB")
@@ -432,6 +432,7 @@ def _run_agent(
         "claude", "-p",
         "--output-format", "stream-json",
         "--verbose",
+        "--no-session-persistence",
         "--model", _ACTIVE_MODEL,
         "--allowedTools", "Read",
         "--append-system-prompt", system_prompt,

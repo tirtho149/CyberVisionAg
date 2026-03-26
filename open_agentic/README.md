@@ -1527,3 +1527,123 @@ For soybean, the sweep automatically uses the prepared dataset (`--ref-dir`, `--
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
 ```
+
+---
+
+## Adding a new crop (checklist)
+
+All commands from AgCrawler root, with conda env `vl-reasoning` active and `.env` sourced.
+
+**Inputs**: A folder of raw images organized as `{class_name}/img.jpg`. Can be anywhere (e.g., `Data/Corn/`, `CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases/`).
+
+**Outputs**: `Prepared_Dataset/{Crop}/` (refs with part subfolders), `Prepared_Dataset/{Crop}_test/` (test images), sweep results in `results/open_agentic/`.
+
+### 1. Generate internet KB
+
+```bash
+python -m disease_registry.pipeline --crop CROP --track internet \
+  --disease-dir /path/to/raw/images
+```
+
+Produces `disease_registry/outputs/{Crop}_internet.xlsx`. Already done for: Soybean, Corn, Mango, Tomato.
+
+### 2. Inspect raw data, decide exclude list
+
+Browse class folders, check image counts, identify duplicates or ambiguous classes. Use `inspect_dataset.py` for visual grids if the data is in `Curated_Local_Dataset/`. Otherwise just `ls` the folders.
+
+### 3. Prepare dataset
+
+Uses KB descriptions to filter images (match/reject), tag plant parts, and split into ref + test sets.
+
+```bash
+python -m CyberVisionAg.open_agentic.prepare_dataset \
+  --input-dir /path/to/raw/images \
+  --output-dir CyberVisionAg/Prepared_Dataset/CROP \
+  --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 \
+  --seed 42 --parallel 20 \
+  --exclude "CLASS1,CLASS2,..."
+```
+
+Creates `Prepared_Dataset/{Crop}/{Class}/{part}/img.jpg` (refs) and `Prepared_Dataset/{Crop}_test/{Class}/img.jpg` (test). Check for classes with 0 test images and add them to the exclude list.
+
+### 4. Generate part index
+
+Build `part_index.md` from the prepared ref folder structure. This maps plant parts to disease classes so the agent can narrow candidates.
+
+```bash
+python -c "
+from pathlib import Path
+ref_dir = Path('CyberVisionAg/Prepared_Dataset/CROP')
+test_dir = Path('CyberVisionAg/Prepared_Dataset/CROP_test')
+test_classes = set(d.name for d in test_dir.iterdir() if d.is_dir())
+parts = {}
+for cls_dir in sorted(ref_dir.iterdir()):
+    if not cls_dir.is_dir() or cls_dir.name not in test_classes: continue
+    for part_dir in cls_dir.iterdir():
+        if part_dir.is_dir() and part_dir.name not in ('rejected', 'test', 'merged'):
+            parts.setdefault(part_dir.name, []).append(cls_dir.name)
+with open(ref_dir / 'part_index.md', 'w') as f:
+    f.write('# Plant Part -> Disease Classes\n\n')
+    f.write('Use this to narrow candidates based on the plant part visible in the test image.\n')
+    for part in sorted(parts):
+        f.write(f'\n## {part} ({len(parts[part])} classes)\n')
+        for cls in sorted(parts[part]):
+            f.write(f'- {cls}\n')
+"
+```
+
+### 5. Add crop to run_sweeps.sh
+
+Add a case block in `setup_crop()` with DATASET, EXCLUDE, KB_SOURCES, REF_DIR, TEST_DIR, PART_INDEX. See the soybean block as a template.
+
+### 6. Run the sweep
+
+```bash
+bash CyberVisionAg/open_agentic/run_sweeps.sh status CROPNAME
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing CROPNAME
+bash CyberVisionAg/open_agentic/run_sweeps.sh results CROPNAME
+```
+
+### Notes
+
+- Keep the exclude list consistent across prepare_dataset and run_sweeps.sh.
+- The sweep is resumable (`run-missing` skips completed configs).
+- Approximate costs: KB generation ~$1-2, data preparation ~$3-5, full sweep ~$0 (subscription).
+
+---
+
+## Corn (Data/Corn, 58 raw classes)
+
+### Step 1: KB generation (2026-03-25)
+
+```bash
+python -m disease_registry.pipeline --crop Corn --track internet --disease-dir Data/Corn
+```
+Result: 44/58 classes matched with web data. Output: `disease_registry/outputs/Corn_internet.xlsx`
+
+### Step 2: Exclude list
+
+Excluded for too few prefix images (<3): Anthracnose_Ear_Infection, Leaf_Blight, Leaf_Spot, Maize_Lethal_Necrosis, Penicillium_On_Seedling, Pythium, Rhizoctonia, Rust, Smut
+
+Excluded for being generic/ambiguous/no KB: Ear_Rots, General_And_Mixed_Ear_Rots, General_And_Mixed_Stalk_Rots, Genetic_Flecking_Or_Striping, Genetic_Streaking, Diplodia, Chocolate_Spot
+
+### Step 3: Data preparation
+
+```bash
+python -m CyberVisionAg.open_agentic.prepare_dataset \
+  --input-dir Data/Corn \
+  --output-dir CyberVisionAg/Prepared_Dataset/Corn \
+  --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 \
+  --seed 42 --parallel 20 \
+  --filename-prefix Corn_Disease \
+  --exclude "Anthracnose_Ear_Infection,Leaf_Blight,Leaf_Spot,Maize_Lethal_Necrosis,Penicillium_On_Seedling,Pythium,Rhizoctonia,Rust,Smut,Ear_Rots,General_And_Mixed_Ear_Rots,General_And_Mixed_Stalk_Rots,Genetic_Flecking_Or_Striping,Genetic_Streaking,Diplodia,Chocolate_Spot"
+```
+Result: 42 classes inspected (665 images), 274 refs, 88 test images, 0 errors. 30 classes with test images, 12 with 0 test images.
+
+### Step 4: Part index
+
+Generated from prepared ref folder structure. Parts: leaf (22), stem (15), whole_plant (19), seed (12), pod (7), root (2).
+
+### Step 5: Sweep config
+
+Added to `run_sweeps.sh` with full exclude list (16 from step 2 + 12 with 0 test images = 28 excluded). 30 test classes, 88 test images.
