@@ -61,9 +61,10 @@ setup_crop() {
             DATASET="Mango_Leaf_Disease"
             EXCLUDE="Bacterial_Canker"
             KB_SOURCES=("none" "internet")
-            REF_DIR="CyberVisionAg/Prepared_Dataset/Mango"
-            TEST_DIR="CyberVisionAg/Prepared_Dataset/Mango_test"
-            PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango/part_index.md"
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Mango_Leaf"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Mango_Leaf_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango_Leaf/part_index.md"
+            IMAGES=10  # override: use all 10 test images per class (only 4 classes)
             ;;
         tomato)
             DATASET="Tomato_Diseases"
