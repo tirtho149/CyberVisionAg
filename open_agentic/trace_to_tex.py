@@ -71,14 +71,31 @@ def trace_to_tex(
 
     # Copy test image (small thumbnail) to traces/images/
     img_tex = ""
-    test_class = result.get("test_image", ground_truth)
-    src_img = SCRIPT_DIR.parent / "Curated_Local_Dataset" / "test" / crop / test_class / f"{image_name}.jpg"
-    if src_img.exists():
+    # image_name is ClassName__ImageStem, extract both parts
+    if "__" in image_name:
+        test_class, img_stem = image_name.split("__", 1)
+    else:
+        test_class = result.get("test_image", ground_truth)
+        img_stem = image_name
+    # Try prepared dataset first, then curated dataset
+    PREPARED_DIR = SCRIPT_DIR.parent / "Prepared_Dataset"
+    crop_short = crop.replace("_Diseases", "").replace("_Disease", "")
+    search_paths = [
+        PREPARED_DIR / f"{crop_short}_test" / test_class / f"{img_stem}.jpg",
+        PREPARED_DIR / f"{crop_short}_test" / test_class / f"{img_stem}.jpeg",
+        PREPARED_DIR / f"{crop_short}_test" / test_class / f"{img_stem}.png",
+        SCRIPT_DIR.parent / "Curated_Local_Dataset" / "test" / crop / test_class / f"{img_stem}.jpg",
+    ]
+    src_img = None
+    for p in search_paths:
+        if p.exists():
+            src_img = p
+            break
+    if src_img:
         from PIL import Image as PILImage
         img_out_dir = TRACES_OUT / "images"
         img_out_dir.mkdir(parents=True, exist_ok=True)
         img_out = img_out_dir / f"{image_name}.jpg"
-        # Resize to small thumbnail
         im = PILImage.open(src_img)
         im.thumbnail((150, 150))
         im.save(img_out, quality=80)
