@@ -1,5 +1,7 @@
 # Paper Storyline & Writing Plan
 
+> **How this file works**: This is the single source of truth for paper writing. Major steps are marked `[x]` (done) or `[ ]` (pending). When working on a step, add small sub-items below it with specific instructions (e.g., "remove collage mention at line 191"). Remove these sub-items once done. The major step markers stay permanently as a record of what was completed.
+
 ## Title (working)
 
 **SAGE: Scalable Agentic Grounded Evaluation for Crop Disease Diagnosis**
@@ -12,9 +14,13 @@ Plant disease diagnosis at scale is bottlenecked by the lack of datasets that co
 
 ## Big Picture
 
-We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~670,000 images across 56 crops (478 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 27 classes, Corn 24 classes, Mango 7 classes) — chosen to represent different scales of difficulty. Evaluation on additional crops is planned but limited by the compute-intensive nature of agentic inference.
+We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~670,000 images across 56 crops (478 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 25 classes, Corn 30 classes, Mango 4 classes), chosen to represent different scales of difficulty.
 
 The system is designed around **explainability**: every diagnosis produces a full reasoning trace showing which references were examined, what visual features were observed, and how alternatives were ruled out. In agricultural diagnostics, knowing *why* matters for treatment decisions and for the farmer or extension agent to visually verify the diagnosis.
+
+**Framing notes** (for writing):
+- **Knowledge-augmented visual reasoning**: The KB provides structured symptom descriptions and anatomical context (which organs each disease affects). This tells the agent what visual signals to look for and narrows the candidate set via an anatomical index.
+- **Guided chain of thought**: Given this knowledge, the agent follows a structured but open-ended reasoning sequence: review symptoms, narrow by anatomical context, then sequentially compare reference images before deciding. Every step is visible in the trace.
 
 ---
 
@@ -33,24 +39,23 @@ The system is designed around **explainability**: every diagnosis produces a ful
 - KBs and pipeline will be contributed as a public resource
 
 ### 3. Agentic diagnostic method
-- An autonomous reasoning agent that receives a test image, labeled reference images, and optionally a structured symptom KB
-- Selectively chooses which references to examine, reasons step-by-step in natural language, uses KB symptoms to guide visual feature identification
-- Produces a structured prediction with full diagnostic reasoning trace — every step is visible and auditable
+- KB provides symptom descriptions and anatomical context; the agent uses this to know what to look for and to narrow candidates
+- Guided chain of thought: review symptoms, narrow by anatomy, sequentially compare reference images, decide
+- Produces a structured prediction with full diagnostic reasoning trace
 - Explainability is the design goal, not a side effect
 
 ### 4. Systematic evaluation
 - Zero-shot baseline establishes what the model knows from pretraining
-- Ablation across reference budget (k), KB source (none/local/internet), and model quality (haiku/sonnet/opus)
-- Cross-crop evaluation on datasets of varying difficulty
+- Ablation across reference budget (k), KB source (none/internet), and model quality (haiku/sonnet/opus)
+- Cross-crop evaluation on datasets of varying difficulty (4, 25, 30 classes)
 
 ---
 
 ## Key Findings (brief)
 
-- Zero-shot is non-trivial — the model has pretraining knowledge of plant diseases
-- Adding references with deliberative reasoning provides substantial lift over zero-shot
-- Structured symptom KB contributes meaningful improvement, particularly at lower reference budgets
-- Model quality scales consistently across all crops
+- Higher k (more reference images) consistently improves accuracy across all crops and configurations
+- KB improves accuracy across all crops: +7.9 to +13.6pp on Corn, +2.7 to +13.5pp on Soybean. Mean improvement +15.2pp at k=16
+- Stronger models perform better: Opus > Sonnet > Haiku on all crops (Opus reaches 62.2% on Soybean, 61.4% on Corn)
 - Full reasoning traces provide transparency into every diagnostic decision
 
 ---
@@ -73,7 +78,7 @@ The system is designed around **explainability**: every diagnosis produces a ful
 
 ### Section 3: Dataset (`sec:dataset`)
 - Image sources: expert-curated across ~350 crops, multi-organ coverage
-- Evaluation subset: Soybean (27 classes), Corn (24 classes), Mango (7 classes)
+- Evaluation subset: Soybean (25 classes, 74 test), Corn (30 classes, 88 test), Mango (4 classes, 40 test)
 - Train/test splits and curation details
 - Registry schema table: crop, disease, pathogen, type, affected organs, visual symptoms — each with `{value, url, quote}`
 
@@ -87,32 +92,30 @@ The system is designed around **explainability**: every diagnosis produces a ful
 
 ### Section 5: Agentic Diagnostic Pipeline (`sec:agent`)
 - System architecture: eval harness spawns parallel `claude -p` agents
-- Each agent receives: test image, reference image paths (collages), class list, optional KB text
-- Multi-turn reasoning: observe test image → form hypotheses → select reference → compare → articulate → decide
-- Reference budget k controls how many collages the agent can view
-- Prompt design and reasoning structure
-- [x] **DONE**: Section 5 briefly mentions calibration phase with forward reference to `sec:calibration`
+- Each agent receives: test image, individual reference image paths, class list, optional KB text + anatomical index
+- Guided chain of thought: observe test image → identify anatomical context → narrow candidates via anatomical index → review KB symptoms → sequentially compare reference images → decide
+- Reference budget k controls how many images the agent can view
+- Prompt design: k-adaptive (at high k, visual comparison takes priority over KB text)
+- [ ] **TODO**: Remove collage and calibration/attractor guide references. Add anatomical context description.
 
 ### Section 6: Experiments (`sec:experiments`)
-- Datasets and setup
-- Zero-shot baseline
-- Ablations: k values, KB source, model scaling
-- Metrics: accuracy, per-class accuracy (mean + std across classes), cost, avg turns, refs viewed
-- Per-class std captures instability / variance across disease classes
+- Datasets and setup (KB-filtered prepared datasets, anatomical index)
+- Ablations: k values (0,1,4,8,16), KB source (none/internet), model scaling (haiku/sonnet/opus)
+- Metrics: accuracy, per-class accuracy, cost, avg turns, refs viewed
 - Results and analysis
 - Qualitative: example reasoning traces
-- [x] **DONE (k=0)**: Updated k range to `(0, 1, 4, 8, 16)` in main.tex, generate_tables.py, generate_figures.py. Regenerated table and figure.
-- [x] **DONE (attractor guide)**: Subsection "Calibration via Attractor Guide" (`sec:calibration`) in Section 6. Framed as a calibration phase, not session memory. Table from `table_attractor_guide.tex`. Confusion matrices for all 3 crops (Soybean in main text, Corn+Mango in appendix). Caption and text both cite Phytophthora column (data-backed).
-- [x] **DONE (calibration trace)**: `Septoria_brown_spot_test_006` from `k8_cg/traces/`. Agent initially predicted Frogeye_leaf_spot, read `Frogeye_leaf_spot.md` calibration file (over-predicted 20x, actual usually Septoria 5x), reconsidered visual differences (gray centers vs uniformly dark brown), changed to Septoria_brown_spot (correct). Output: `traces/trace_calibration.tex`. To regenerate: `trace_to_tex('Soybean_Diseases', 'internet', 'opus', 8, 'Septoria_brown_spot_test_006', k_label='k8_cg')`. To pick a new trace: search AG traces for correct predictions where pre-calibration text mentions a different initial class than the final prediction.
+- [ ] **TODO**: Update inline numbers to match new sweep results
+- [ ] **TODO**: Remove attractor guide/calibration subsection and confusion matrices
+- [ ] **TODO**: Add discussion of anatomical context narrowing
+- [ ] **TODO**: Update or regenerate reasoning trace examples from new results
 
 ### Section 7: Discussion (`sec:discussion`)
-- Few-shot vs agentic reasoning: different inference paradigms. Few-shot processes all references in a single forward pass with no structured comparison — it is a black box. Our approach is deliberative and sequential, optimizing for explainability. There is a cost to this (more compute per image), but in agricultural diagnostics, transparency and verifiability are essential.
-- When KB helps and when it doesn't
-- Failure analysis: visually ambiguous diseases
+- Few-shot vs agentic reasoning: different inference paradigms. Few-shot processes all references in a single forward pass with no structured comparison. Our approach is deliberative and sequential, optimizing for explainability.
+- KB helps consistently across crops, especially at lower k
+- Failure analysis: visually ambiguous diseases (trace analysis shows agent views GT class but picks wrong match)
 - Cost-accuracy tradeoffs
 - Limitations
-- [x] **DONE (k=0)**: k=0 included in all tables/figures
-- [x] **DONE (calibration)**: Discussion frames calibration as agent learning from its own prediction history, not session memory. Scales with model capability.
+- [ ] **TODO**: Update with new results and remove calibration framing
 
 ### Section 8: Conclusion (`sec:conclusion`)
 
@@ -228,70 +231,37 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - Auto-generated via `generate_tables.py` from summary JSONs
 - Bold best per crop-k, caption notes 3 images/class
 - Model ablation shown in Figure 5 (no separate table needed)
-- [x] **DONE**: Baseline changed from DC to Agent(no KB, k=0). DC removed from table, figures, and text.
-- [ ] **TODO (local k=0)**: Soybean local/sonnet/k0 is MISSING. Shows as -- in table. Run if needed.
-- [x] **DONE**: Attractor guide table added (`table_attractor_guide.tex`) with Mean delta row (+5.2pp).
 - [x] **DONE**: Main results table has Mean delta rows for Agent(no KB) and Agent+internet KB.
-- [x] **DONE**: Few-shot comparison table simplified to few-shot only (agent numbers already in Table 1), with Mean delta row.
-- [x] **DONE**: Confusion matrix titles updated to "Baseline (X%)" and "Calibration Enabled (X%)".
+- [x] **DONE**: Few-shot comparison table with Mean delta row.
 
 ---
 
 ## Step-by-Step Execution Plan
 
 ### Phase 1: Lock down results
-- [x] Run all sweeps (soybean, corn, mango)
-- [x] Fix corn k=8 contamination
-- [x] Run zero-shot baseline for all 3 crops
-- [x] Verify all numbers are clean and consistent (cross-check all 54 summary JSONs)
-- [x] Commit final results
+- [x] Run all sweeps with prepared datasets (soybean 25 cls, corn 30 cls, mango 4 cls)
+- [x] All 17 configs per crop complete (none/internet x k=0,1,4,8,16 + model ablation + few-shot)
+- [x] `generate_tables.py` and `generate_figures.py` updated and regenerated
 
-### Phase 2: Generate figures
-- [x] Create `CyberVisionAg/open_agentic/generate_figures.py` (reads directly from summary JSONs + `all-crops.xlsx`)
-- [x] Figure 3: Sunburst — crop-disease hierarchy (Plotly, exported via kaleido)
-- [x] Figure 4: Accuracy vs k line plots (1x3 panel) with zero-shot floor
-  - [x] **DONE**: Regenerated with k=0 as leftmost point
-- [x] Figure 5: Model scaling + KB comparison (1x2 combined panel)
-- [ ] Figure 6: Per-class accuracy heatmap (deferred)
-- [x] All plots read from raw data files — no hardcoded numbers
-- [x] Saved as PDF in `writing/69aae430e8bdcbd9056bf911/figures/`
-- [x] Integrated into main.tex at correct positions
+### Phase 2: Update main.tex
 
-### Phase 3: Reasoning trace pipeline
-- [x] Write `CyberVisionAg/open_agentic/trace_to_tex.py` — converts JSON trace → formatted `.tex` file
-- [x] Each `.tex` file displays: config (k, model, KB source), test image thumbnail, step-by-step reasoning, prediction, ground truth
-- [x] Output to `writing/69aae430e8bdcbd9056bf911/traces/` with images in `traces/images/`
-- [x] main.tex uses `\input{traces/trace_intext.tex}` for in-text example (soybean, internet KB, k=4)
-- [x] 1 in-text trace + 15 appendix traces (no duplication)
-- [x] Appendix included via `\input{traces/traces_appendix.tex}`
-- [ ] Expand later: more crops, KB sources, k values, models as needed
+- [x] **Fix class counts** — Updated to Soybean (25), Corn (30), Mango (4). Removed local KB mention.
+- [x] **Rewrite Section 5** — Removed collage, added anatomical context/index, guided chain of thought, sequential comparison.
+- [x] **Rewrite Section 6 intro** — Fixed inline numbers (Soybean +13.5pp, Corn +9.1pp), updated class counts, removed local KB.
+- [x] **Replace Section 6.1** — Removed calibration subsection. TODO placeholder for new confusion matrices (k=0/none vs k=16/internet).
+- [x] **Update Section 7** — Updated Mango to 4 classes, removed calibration paragraph, updated KB contribution with new numbers.
+- [x] **Update abstract** — New numbers (+15.2pp mean), removed calibration sentence, added guided chain of thought.
+- [x] **Update appendix** — Removed old attractor confusion matrices. TODO placeholder for new ones.
 
-### Phase 4: Write the paper (in main.tex)
-- [x] Section 1: Introduction (data-first framing, four contributions, citations grounded)
-- [x] Section 2: Related Work (flowing prose, no subsections — datasets, VLMs, CoT/agentic)
-- [x] Section 3.1: Dataset — Image Sources (four source categories with citations)
-- [ ] Section 3.2: Dataset — Splits (still bullet points)
-- [ ] Section 3.3: Dataset — Registry Schema (table exists, needs prose)
-- [x] Section 4: Disease Registry Pipeline (source-first principle, three stages in flowing prose)
-  - **Future note**: Reconciliation prompt includes 6-tier source authority ranking (NCBI > APS > CABI > peer-reviewed > extension > industry). Confirmed in `prompts/reconciliation.py:15-22`. Could be mentioned in a revision if reviewers ask about conflict resolution.
-- [x] Section 5: Agentic Diagnostic Pipeline (3 paragraphs: inputs, reasoning process, trace/explainability)
-  - **Future**: Add appendix section before traces with: (1) exact system prompt, (2) example user message structure, (3) one complete registry schema entry. All auto-generated from source files via script.
-- [x] Section 6: Experiments (setup, results with inline numbers verified against data, figures/tables/trace referenced)
-- [x] Section 7: Discussion (3 paragraphs: main findings, few-shot comparison with appendix table, limitations)
-- [x] Section 8: Conclusion merged into Discussion
-- [x] Abstract (written -- 613K images, KB +10.7pp avg, calibration +6.2pp, no task-specific training, benefits from future models)
+### Phase 3: Regenerate traces
+- [x] In-text trace: auto-selected first correct from Soybean/internet/sonnet/k4
+- [x] 15 appendix traces across all crops/configs
+- [x] Confusion matrices: baseline (k=0/none) vs best (k=16/internet) for all 3 crops
+- [x] Soybean highlight: Sudden_death_syndrome over-prediction (14 FP → 3 FP)
 
-### Phase 5: Literature review
-- [x] Receive abstracts and references.bib files from user
-- [x] Added 20+ references: 6 published papers, 14 Kaggle datasets, 6 additional papers (ChatLeafDisease, PDD-AGENT, CDDM, WDLM, AgroGPT, Agri-LLaVA, AgReason, AgEval)
-- [x] All bib entries verified (URLs, authors, titles) via parallel agents + WebFetch
-- [x] Write Section 2: Related Work from provided references
-- [x] References integrated naturally into Introduction and Related Work
-- [ ] Iterate with user on coverage and framing (ongoing)
-
-### Phase 6: Polish
-- [ ] Cross-check all numbers: text vs figures vs tables vs summary JSONs
-- [ ] Ensure figure/table references in text are correct
-- [ ] Expand reasoning trace collection (more crops, more cases)
-- [ ] Proofread for consistency and clarity
-- [ ] Format for target venue
+### Phase 4: Polish
+- [x] Grepped main.tex: no remaining old references (collage, attractor, calibration, old class counts)
+- [x] Paper compiles (23 pages, no errors)
+- [ ] Cross-check all inline numbers against summary JSONs
+- [ ] Update open_agentic/README.md with final results table
+- [ ] Commit and push all changes

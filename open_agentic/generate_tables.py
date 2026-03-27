@@ -69,9 +69,9 @@ def _fmt_delta(acc, baseline, bold=False):
 def table_main_results():
     """Compact table: agent methods across k, delta from Agent(no KB, k=0) baseline."""
     crops = [
-        ("Soybean_Diseases", "Soybean (27)", ["none", "local", "internet"]),
-        ("Corn_Diseases", "Corn (24)", ["none", "internet"]),
-        ("Mango_Leaf_Disease", "Mango (7)", ["none", "internet"]),
+        ("Soybean_Diseases", "Soybean (25)", ["none", "internet"]),
+        ("Corn_Diseases", "Corn (30)", ["none", "internet"]),
+        ("Mango_Leaf_Disease", "Mango (4)", ["none", "internet"]),
     ]
     ks = [0, 1, 4, 8, 16]
     method_labels = {
@@ -415,10 +415,7 @@ def main():
     out.write_text(tex)
     print(f"  Few-shot comparison → {out.name}")
 
-    tex = table_attractor_guide()
-    out = TABLES_OUT / "table_attractor_guide.tex"
-    out.write_text(tex)
-    print(f"  Attractor guide → {out.name}")
+    # Attractor guide table removed (not in current pipeline)
 
 
 if __name__ == "__main__":

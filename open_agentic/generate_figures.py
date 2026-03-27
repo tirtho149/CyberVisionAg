@@ -216,9 +216,9 @@ def figure_4_accuracy_vs_k():
     })
 
     crops = [
-        ("Soybean_Diseases", "Soybean (27 classes)", ["none", "internet", "local"]),
-        ("Corn_Diseases", "Corn (24 classes)", ["none", "internet"]),
-        ("Mango_Leaf_Disease", "Mango (7 classes)", ["none", "internet"]),
+        ("Soybean_Diseases", "Soybean (25 classes)", ["none", "internet"]),
+        ("Corn_Diseases", "Corn (30 classes)", ["none", "internet"]),
+        ("Mango_Leaf_Disease", "Mango (4 classes)", ["none", "internet"]),
     ]
     ks = [0, 1, 4, 8, 16]
 
