@@ -252,6 +252,10 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - [x] **Update Section 7** — Updated Mango to 4 classes, removed calibration paragraph, updated KB contribution with new numbers.
 - [x] **Update abstract** — New numbers (+15.2pp mean), removed calibration sentence, added guided chain of thought.
 - [x] **Update appendix** — Removed old attractor confusion matrices. TODO placeholder for new ones.
+- [x] **Sunburst** — Updated to new CSV (1.1M images, 53 crops, 259 unique diseases)
+- [x] **Dataset numbers** — All 6 locations updated (613K→1.1M, 55→53, 477→259)
+- [x] **Section 3.2** — Expanded to describe KB-guided image filtering, anatomical tagging, clean splits
+- [x] **Figure 2** — Extended with second row: Registry → Image Filtering → Ref set + Test set + Anatomical index
 
 ### Phase 3: Regenerate traces
 - [x] In-text trace: auto-selected first correct from Soybean/internet/sonnet/k4

@@ -17,24 +17,21 @@ import numpy as np
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = SCRIPT_DIR.parent / "results" / "open_agentic"
-XLSX_PATH = SCRIPT_DIR / "all-crops.xlsx"
+CSV_PATH = SCRIPT_DIR / "all-crops-v2.csv"
 FIGURES_DIR = Path(__file__).resolve().parents[2] / "writing" / "69aae430e8bdcbd9056bf911" / "figures"
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
-def load_xlsx_data():
-    """Load crop/disease/image data from all-crops.xlsx Summary sheet."""
-    import openpyxl
-    wb = openpyxl.load_workbook(XLSX_PATH, read_only=True)
-    ws = wb["Summary"]
+def load_crop_data():
+    """Load crop/disease/image data from all-crops-v2.csv."""
+    import csv
     crops = defaultdict(list)
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        num, crop, disease, nsrc, sources, images = row[:6]
-        if not crop or crop == "Images":
-            continue
-        img = int(images) if images and isinstance(images, (int, float)) else 0
-        crops[crop].append((disease or "Unknown", img))
-    wb.close()
+    with open(CSV_PATH) as f:
+        for row in csv.DictReader(f):
+            crop = row["crop"]
+            disease = row["disease"]
+            images = int(row["images"])
+            crops[crop].append((disease, images))
     return dict(crops)
 
 
@@ -66,11 +63,11 @@ def figure_3_sunburst():
     """Sunburst chart using Plotly: crop → disease hierarchy."""
     import plotly.graph_objects as go
 
-    data = load_xlsx_data()
+    data = load_crop_data()
     crop_totals = {c: sum(img for _, img in ds) for c, ds in data.items()}
     sorted_crops = sorted(crop_totals.items(), key=lambda x: -x[1])
     total_images = sum(crop_totals.values())
-    total_diseases = sum(len(ds) for ds in data.values())
+    total_diseases = len({d for ds in data.values() for d, _ in ds})
 
     # Build hierarchical data for plotly sunburst
     # Structure: root → crops → diseases
@@ -173,7 +170,7 @@ def figure_3_sunburst():
             dict(
                 type="circle",
                 xref="paper", yref="paper",
-                x0=0.38, y0=0.38, x1=0.62, y1=0.62,
+                x0=0.39, y0=0.39, x1=0.61, y1=0.61,
                 fillcolor="rgba(255,255,255,0.85)",
                 line=dict(width=0),
                 layer="above",
@@ -181,7 +178,7 @@ def figure_3_sunburst():
         ],
         annotations=[
             dict(
-                text=f"<b>{total_images // 1000}K</b><br>Images<br><span style='font-size:9px;color:#7f8c8d'>{len(data)} crops · {total_diseases} diseases</span>",
+                text=f"<b>{total_images / 1_000_000:.1f}M</b><br>Images<br><span style='font-size:9px;color:#7f8c8d'>{len(data)} crops · {total_diseases} diseases</span>",
                 x=0.5, y=0.5, showarrow=False,
                 font=dict(size=16, family="Arial", color="#2c3e50"),
                 xref="paper", yref="paper",
