@@ -258,6 +258,23 @@ def figure_4_accuracy_vs_k():
                     linestyle=style["ls"], linewidth=2, markersize=6,
                     label=style["label"], zorder=3)
 
+        # Add haiku and opus markers at k=8 (internet KB, model ablation)
+        model_markers = [
+            ("haiku", "v", "#95a5a6", "Haiku"),
+            ("opus", "*", "#8e44ad", "Opus"),
+        ]
+        for model, marker, color, label in model_markers:
+            acc, _ = get_accuracy_and_std(crop, "internet", model, 8)
+            if acc is not None:
+                ax.scatter([8], [acc], marker=marker, color=color, s=80,
+                           zorder=5, edgecolors='black', linewidths=0.5,
+                           label=f"{label} (k=8)" if ax == axes[0] else None)
+                all_accs.append(acc)
+                # Annotate with accuracy value
+                offset = 6 if model == "opus" else -10
+                ax.annotate(f"{acc:.1f}", (8, acc), textcoords="offset points",
+                            xytext=(8, offset), fontsize=8, color=color, fontweight='bold')
+
         ax.set_title(title, fontweight='bold')
         ax.set_xlabel("Reference budget (k)")
         ax.set_xticks(ks)
