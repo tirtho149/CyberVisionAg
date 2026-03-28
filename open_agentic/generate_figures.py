@@ -314,92 +314,142 @@ def figure_4_accuracy_vs_k():
 
 # ── Figure 5: Model scaling + KB comparison ───────────────────────────────────
 
-def figure_5_model_and_kb():
-    """Combined panel: (a) model ablation, (b) direct classification vs agent vs agent+KB."""
-    import matplotlib.pyplot as plt
+def _load_per_image_results(crop, kb_source, model, k):
+    """Load all per-image result JSONs for a configuration."""
+    import glob
+    result_dir = RESULTS_DIR / crop / kb_source / model / f"k{k}"
+    results = []
+    for path in sorted(result_dir.glob("*.json")):
+        if path.name == "summary.json":
+            continue
+        d = json.loads(path.read_text())
+        if d.get("error"):
+            continue
+        results.append(d)
+    return results
 
+
+def figure_5_cost_accuracy():
+    """Cost-accuracy tradeoff: single panel, accuracy averaged across Soybean + Corn.
+
+    Per-image costs from both crops pooled as jittered dots at the mean accuracy level.
+    No connecting line. Aggregate means as large bubbles with k labels.
+    Haiku/Opus at k=8 labeled. Mango omitted (saturates >90%).
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    # Match Figure 4 rcParams
     plt.rcParams.update({
         'font.family': 'Arial',
-        'font.size': 11,
-        'axes.labelsize': 12,
-        'axes.titlesize': 13,
-        'xtick.labelsize': 10,
-        'ytick.labelsize': 10,
+        'font.size': 13,
+        'axes.labelsize': 13,
+        'axes.titlesize': 14,
+        'xtick.labelsize': 11,
+        'ytick.labelsize': 11,
         'legend.fontsize': 10,
     })
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.2))
-
-    crop_labels = ["Soybean", "Corn", "Mango"]
     crop_ids = ["Soybean_Diseases", "Corn_Diseases", "Mango_Leaf_Disease"]
+    model_colors = {
+        "haiku": "#f39c12",
+        "sonnet": "#3498db",
+        "opus": "#e74c3c",
+    }
+    model_labels = {"haiku": "Haiku", "sonnet": "Sonnet", "opus": "Opus"}
 
-    # ── Panel (a): Model ablation (internet KB, k=8) ─────────────────────
-    models = ["haiku", "sonnet", "opus"]
-    model_labels = ["Haiku", "Sonnet", "Opus"]
-    model_colors = ["#f39c12", "#3498db", "#e74c3c"]
-
-    x = np.arange(len(crop_labels))
-    bar_width = 0.22
-
-    for i, (model, mlabel, mcolor) in enumerate(zip(models, model_labels, model_colors)):
-        accs = []
-        for crop in crop_ids:
-            acc, _ = get_accuracy_and_std(crop, "internet", model, 8)
-            accs.append(acc if acc is not None else 0)
-
-        bars = ax1.bar(x + (i - 1) * bar_width, accs, bar_width,
-                       color=mcolor, alpha=0.85, label=mlabel, edgecolor='white', linewidth=0.5)
-        # Value labels on bars
-        for bar, acc in zip(bars, accs):
-            if acc > 0:
-                ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                         f'{acc:.1f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
-
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(crop_labels)
-    ax1.set_ylabel("Accuracy (%)")
-    ax1.set_title("(a) Model Scaling (internet KB, k=8)", fontweight='bold')
-    ax1.legend(loc='upper left')
-    ax1.grid(axis='y', linestyle='--', alpha=0.4)
-
-    # Dynamic y-axis
-    all_vals = [v for v in [get_accuracy_and_std(c, "internet", m, 8)[0]
-                            for c in crop_ids for m in models] if v]
-    y_max = max(all_vals) if all_vals else 100
-    ax1.set_ylim(0, min(100, y_max + 12))
-
-    # ── Panel (b): Baseline (k=0) vs Agent vs Agent+KB at k=4 ─────────────────
-    methods = [
-        ("Baseline (k=0)", "none", "sonnet", 0, "#7f8c8d"),
-        ("Agent (no KB, k=4)", "none", "sonnet", 4, "#3498db"),
-        ("Agent + KB (k=4)", "internet", "sonnet", 4, "#e74c3c"),
+    configs = [
+        ("sonnet", 0), ("sonnet", 1), ("sonnet", 4), ("sonnet", 8), ("sonnet", 16),
+        ("haiku", 8), ("opus", 8),
     ]
 
-    bar_width = 0.22
-    for i, (mlabel, source, model, k, mcolor) in enumerate(methods):
+    # Bubble size scaling: k → area (more distinct sizes)
+    def k_to_size(k):
+        return 120 + k * 30
+
+    fig, ax = plt.subplots(1, 1, figsize=(13, 4))
+
+    rng = np.random.default_rng(42)
+
+    # Per-image jitter clouds for each config
+    for model, k in configs:
         accs = []
-        for crop in crop_ids:
-            acc, _ = get_accuracy_and_std(crop, source, model, k)
-            accs.append(acc if acc is not None else 0)
+        all_costs = []
+        for crop_id in crop_ids:
+            d = load_summary(crop_id, "internet", model, k)
+            if d:
+                accs.append(d["metrics"]["accuracy"])
+            results = _load_per_image_results(crop_id, "internet", model, k)
+            all_costs.extend(r["cost_usd"] for r in results)
 
-        bars = ax2.bar(x + (i - 1) * bar_width, accs, bar_width,
-                       color=mcolor, alpha=0.85, label=mlabel, edgecolor='white', linewidth=0.5)
-        for bar, acc in zip(bars, accs):
-            if acc > 0:
-                ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                         f'{acc:.1f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+        if not accs or not all_costs:
+            continue
+        mean_acc = sum(accs) / len(accs)
 
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(crop_labels)
-    ax2.set_ylabel("Accuracy (%)")
-    ax2.set_title("(b) Baseline vs Agent vs Agent+KB (k=4)", fontweight='bold')
-    ax2.legend(loc='upper left')
-    ax2.grid(axis='y', linestyle='--', alpha=0.4)
+        jitter = rng.normal(0, 0.5, len(all_costs))
 
-    all_vals = [v for v in [get_accuracy_and_std(c, s, m, k)[0]
-                            for c in crop_ids for _, s, m, k, _ in methods] if v]
-    y_max = max(all_vals) if all_vals else 100
-    ax2.set_ylim(0, min(100, y_max + 12))
+        ax.scatter(
+            all_costs, mean_acc + jitter,
+            s=18, c=model_colors[model],
+            alpha=0.2, edgecolors='none', zorder=2,
+        )
+
+    # Sonnet aggregate bubbles (no line, just bubbles with k-based sizes)
+    for k in [0, 1, 4, 8, 16]:
+        crop_costs, crop_accs = [], []
+        for crop_id in crop_ids:
+            d = load_summary(crop_id, "internet", "sonnet", k)
+            if d:
+                crop_costs.append(d["metrics"]["avg_cost_usd"])
+                crop_accs.append(d["metrics"]["accuracy"])
+        if crop_costs:
+            mean_cost = sum(crop_costs) / len(crop_costs)
+            mean_acc = sum(crop_accs) / len(crop_accs)
+            ax.scatter(mean_cost, mean_acc, s=k_to_size(k),
+                       c=model_colors["sonnet"],
+                       edgecolors='black', linewidth=0.8, zorder=6,
+                       marker='o', alpha=0.85)
+            ax.annotate(f'k={k}', (mean_cost, mean_acc),
+                        textcoords="offset points", xytext=(10, 5),
+                        fontsize=9, color='black', fontweight='bold')
+
+    # Haiku/Opus aggregate bubbles at k=8
+    for model in ["haiku", "opus"]:
+        crop_costs, crop_accs = [], []
+        for crop_id in crop_ids:
+            d = load_summary(crop_id, "internet", model, 8)
+            if d:
+                crop_costs.append(d["metrics"]["avg_cost_usd"])
+                crop_accs.append(d["metrics"]["accuracy"])
+        if crop_costs:
+            mean_cost = sum(crop_costs) / len(crop_costs)
+            mean_acc = sum(crop_accs) / len(crop_accs)
+            ax.scatter(mean_cost, mean_acc, s=k_to_size(8),
+                       c=model_colors[model],
+                       edgecolors='black', linewidth=0.8, zorder=6,
+                       marker='o', alpha=0.85)
+            label = f'{model_labels[model]} (k=8)'
+            ax.annotate(label, (mean_cost, mean_acc),
+                        textcoords="offset points", xytext=(10, -8),
+                        fontsize=9, color=model_colors[model], fontweight='bold')
+
+    ax.set_xlabel("Cost per image (USD)")
+    ax.set_ylabel("Mean accuracy (%)")
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.set_xlim(left=-0.02)
+
+    # Legend: model colors + bubble size
+    model_handles = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=model_colors[m],
+               markersize=9, markeredgecolor='black', markeredgewidth=0.5,
+               label=model_labels[m])
+        for m in ["haiku", "sonnet", "opus"]
+    ]
+    scatter_handle = Line2D([0], [0], marker='o', color='w',
+                            markerfacecolor='lightgray', markersize=4,
+                            alpha=0.4, label='Per-image cost')
+    ax.legend(handles=model_handles + [scatter_handle],
+              loc='lower right', framealpha=0.9)
 
     plt.tight_layout()
     out = FIGURES_DIR / "fig5_model_and_kb.pdf"
@@ -418,5 +468,5 @@ if __name__ == "__main__":
     print("\nFigure 4: Accuracy vs k")
     figure_4_accuracy_vs_k()
     print("\nFigure 5: Model scaling + KB comparison")
-    figure_5_model_and_kb()
+    figure_5_cost_accuracy()
     print("\nDone.")

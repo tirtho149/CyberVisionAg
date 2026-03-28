@@ -137,10 +137,10 @@ def trace_to_tex(
     tex = textwrap.dedent(rf"""
     \begin{{tcolorbox}}[
         breakable, colback=gray!3, colframe=gray!50, boxrule=0.5pt,
-        title={{\small \textbf{{Reasoning Trace:}} {_escape_latex(crop_display)} — {image_display}}},
-        fonttitle=\small,
+        title={{\footnotesize \textbf{{Reasoning Trace:}} {_escape_latex(crop_display)} — {image_display}}},
+        fonttitle=\footnotesize,
     ]
-    \small
+    \footnotesize
     \begin{{minipage}}[t]{{0.65\linewidth}}
     \begin{{tabular}}{{@{{}}ll@{{}}}}
         \textbf{{Model:}} & {model} \\
@@ -163,7 +163,7 @@ def trace_to_tex(
     \hrule
     \vspace{{4pt}}
 
-    \begin{{description}}[style=nextline, leftmargin=1.5cm, font=\small\bfseries]
+    \begin{{description}}[style=nextline, leftmargin=1.5cm, font=\footnotesize\bfseries]
     {steps_tex}
     \end{{description}}
     \end{{tcolorbox}}

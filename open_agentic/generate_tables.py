@@ -28,6 +28,15 @@ def _load(crop, source, model, k):
     return d["metrics"]["accuracy"]
 
 
+def _load_metrics(crop, source, model, k):
+    """Load full metrics dict from a summary.json. Returns dict or None."""
+    path = RESULTS_DIR / crop / source / model / f"k{k}" / "summary.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    return d["metrics"]
+
+
 def _fmt(acc, bold=False):
     """Format accuracy as 'X.Y%' or '—'."""
     if acc is None:
@@ -392,6 +401,50 @@ def table_attractor_guide():
     return "\n".join(lines)
 
 
+# ── Table: Cost analysis ─────────────────────────────────────────────────────
+
+def table_cost_analysis():
+    """Cost per image across k values for Sonnet + internet KB, all 3 crops."""
+    crops = [
+        ("Soybean_Diseases", "Soybean"),
+        ("Corn_Diseases", "Corn"),
+        ("Mango_Leaf_Disease", "Mango"),
+    ]
+    ks = [0, 1, 4, 8, 16]
+
+    lines = []
+    lines.append(r"\begin{table}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(r"\caption{Cost and efficiency metrics per image across reference budgets (Sonnet, internet KB). Cost is the API cost in USD per classification.}")
+    lines.append(r"\label{tab:cost}")
+    lines.append(r"\begin{tabular}{llrrr}")
+    lines.append(r"\toprule")
+    lines.append(r"Crop & $k$ & Cost (\$) & Turns & Refs viewed \\")
+    lines.append(r"\midrule")
+
+    for crop_id, crop_label in crops:
+        first_row = True
+        for k in ks:
+            m = _load_metrics(crop_id, "internet", "sonnet", k)
+            if m is None:
+                continue
+            cost = f"{m['avg_cost_usd']:.2f}"
+            turns = f"{m['avg_turns']:.1f}"
+            refs = f"{m.get('avg_refs_viewed', 0):.1f}"
+            prefix = crop_label if first_row else ""
+            lines.append(f"{prefix} & {k} & {cost} & {turns} & {refs} \\\\")
+            first_row = False
+        lines.append(r"\midrule")
+
+    # Replace last midrule with bottomrule
+    lines[-1] = r"\bottomrule"
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table}")
+
+    return "\n".join(lines)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -415,7 +468,10 @@ def main():
     out.write_text(tex)
     print(f"  Few-shot comparison → {out.name}")
 
-    # Attractor guide table removed (not in current pipeline)
+    tex = table_cost_analysis()
+    out = TABLES_OUT / "table_cost.tex"
+    out.write_text(tex)
+    print(f"  Cost analysis → {out.name}")
 
 
 if __name__ == "__main__":

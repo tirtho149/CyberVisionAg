@@ -10,11 +10,11 @@
 
 ## One-liner
 
-Plant disease diagnosis at scale is bottlenecked by the lack of datasets that cover enough crops and diseases. We compile one of the largest disease image datasets (613K images, 55 crops, 477 classes) from multiple sources and complement it with automatically generated, source-cited symptom descriptions. We demonstrate how this combination of visual and structured knowledge enables an agentic reasoning system to diagnose diseases across crops with full transparency and no task-specific training.
+Plant disease diagnosis at scale is bottlenecked by the lack of datasets that cover enough crops and diseases. We compile one of the largest disease image datasets (~1.1M images, 53 crops, 259 classes) from multiple sources and complement it with automatically generated, source-cited symptom descriptions. We demonstrate how this combination of visual and structured knowledge enables an agentic reasoning system to diagnose diseases across crops with full transparency and no task-specific training.
 
 ## Big Picture
 
-We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~670,000 images across 56 crops (478 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 25 classes, Corn 30 classes, Mango 4 classes), chosen to represent different scales of difficulty.
+We present a large-scale effort in plant disease diagnosis that combines data collection, automated knowledge base generation, and an explainable agentic diagnostic system. We have collected ~1.1M images across 53 crops (259 disease classes) and built automated pipelines that generate structured, source-cited disease knowledge for any crop. We demonstrate and evaluate the full system on three crops (Soybean 25 classes, Corn 30 classes, Mango 4 classes), chosen to represent different scales of difficulty.
 
 The system is designed around **explainability**: every diagnosis produces a full reasoning trace showing which references were examined, what visual features were observed, and how alternatives were ruled out. In agricultural diagnostics, knowing *why* matters for treatment decisions and for the farmer or extension agent to visually verify the diagnosis.
 
@@ -266,6 +266,17 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 ### Phase 4: Polish
 - [x] Grepped main.tex: no remaining old references (collage, attractor, calibration, old class counts)
 - [x] Paper compiles (23 pages, no errors)
+- [x] Redesigned Figure 1 right panel (standard vs ours comparison + example entry with organs)
+- [x] Redesigned Figure 2 (Curation + Inference groups, fontawesome icons, sample images, open-ended reasoning box, input tags)
+- [x] Renamed Discussion → Discussion and Conclusion, added closing paragraph
+- [x] Fixed em dash in Related Work (line 121)
+- [x] Strengthened Section 3.2 with anatomical index reference to Figure 2
+- [x] Moved dataset license table to top of appendix, restyled to match paper conventions
+- [x] Added cost analysis table (auto-generated via generate_tables.py from summary JSONs)
 - [ ] Cross-check all inline numbers against summary JSONs
 - [ ] Update open_agentic/README.md with final results table
 - [ ] Commit and push all changes
+
+### Phase 5: Future TODOs
+- [ ] **Registry provenance example in appendix**: Re-run soybean registry pipeline to get a fresh `final_registry.json` with full provenance (value, url, quote triples). Currently the pipeline overwrites the JSON per crop; fix to save per-crop JSONs (like xlsx). Then add a worked example entry to Appendix B showing per-field provenance visually.
+- [ ] **Per-crop registry JSON persistence**: Modify `pipeline.py` to save `{Crop}_final_registry.json` alongside `{Crop}_{track}.xlsx` so provenance is always available.
