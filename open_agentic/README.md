@@ -1,6 +1,6 @@
-# Open Agentic Pipeline — Evolving Plan
+# Open Agentic Pipeline
 
-> **This document is a living plan.** It evolves with each iteration. Lessons learned, failed experiments, and metric changes are recorded here so future development builds on past findings.
+> **This document is a living plan.** The first half covers setup, commands, and architecture. The second half ("Development Notes") records experiment logs and lessons learned.
 
 > **Working directory**: All commands in this file must be run from the **AgCrawler/** root (i.e., `cd /Users/muhammadarbabarshad/build2026-local/AgCrawler`). The Python modules use `CyberVisionAg.open_agentic.*` paths which resolve from that root.
 
@@ -115,12 +115,37 @@ Coverage matters: classes without KB data are effectively in "none" mode regardl
 
 ```
 CyberVisionAg/open_agentic/
-├── README.md           # This file — evolving plan + experiment log
-├── __init__.py         # Package marker
-├── eval.py             # Agentic harness: claude -p dispatch, metrics
-├── few_shot.py         # Few-shot baseline: single API call, no tools
-├── prompt.py           # Prompt construction (system + user message)
-└── run_eval.sh         # Quick eval launcher
+├── README.md                # This file — setup + experiment log
+├── storyline.md             # Paper writing plan (single source of truth)
+├── __init__.py
+│
+│  Core
+├── eval.py                  # Agentic harness: claude -p dispatch, metrics
+├── few_shot.py              # Few-shot baseline: single API call, no tools
+├── prompt.py                # Prompt construction (system + user message)
+│
+│  Data preparation
+├── prepare_dataset.py       # KB-guided image filtering + train/test split
+├── inspect_dataset.py       # Visual grid inspection of datasets
+├── generate_visual_kb.py    # Generate visual KB from reference images
+├── improve_kb.py            # KB refinement from failure analysis
+├── build_confusion_guide.py # Build per-class attractor guides from eval results
+│
+│  Paper outputs
+├── generate_tables.py       # Result tables for paper
+├── generate_figures.py      # Publication plots from result JSONs
+├── trace_to_tex.py          # Convert reasoning traces to LaTeX examples
+├── plot_confusion_matrix.py # Confusion matrix heatmaps
+│
+│  Run scripts
+├── run_eval.sh              # Quick eval launcher
+├── run_sweeps.sh            # Full parameter sweep orchestrator
+├── run_model_k_sweep.sh     # Model x k sweep
+│
+│  Knowledge bases
+├── kb_v0.md, kb_v1.md, kb_v1_clean.md   # KB versions (historical)
+├── visual_kbs/              # Per-crop detailed visual symptom descriptions
+└── confusion_guides/        # Per-crop per-class attractor guides
 ```
 
 ### Run commands
@@ -162,6 +187,94 @@ This README is the single source of truth for continuing work if a conversation 
 - Lessons learned that inform future experiments
 
 To resume: read this README, check the latest experiment, and continue from the next item in the phase checklist.
+
+## Adding a New Crop (checklist)
+
+All commands from AgCrawler root, with conda env `vl-reasoning` active and `.env` sourced.
+
+**Inputs**: A folder of raw images organized as `{class_name}/img.jpg`. Can be anywhere (e.g., `Data/Corn/`, `CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases/`).
+
+**Outputs**: `Prepared_Dataset/{Crop}/` (refs with part subfolders), `Prepared_Dataset/{Crop}_test/` (test images), sweep results in `results/open_agentic/`.
+
+### 1. Generate internet KB
+
+```bash
+python -m disease_registry.pipeline --crop CROP --track internet \
+  --disease-dir /path/to/raw/images
+```
+
+Produces `disease_registry/outputs/{Crop}_internet.xlsx`. Already done for: Soybean, Corn, Mango, Tomato.
+
+### 2. Inspect raw data, decide exclude list
+
+Browse class folders, check image counts, identify duplicates or ambiguous classes. Use `inspect_dataset.py` for visual grids if the data is in `Curated_Local_Dataset/`. Otherwise just `ls` the folders.
+
+### 3. Prepare dataset
+
+Uses KB descriptions to filter images (match/reject), tag plant parts, and split into ref + test sets.
+
+```bash
+python -m CyberVisionAg.open_agentic.prepare_dataset \
+  --input-dir /path/to/raw/images \
+  --output-dir CyberVisionAg/Prepared_Dataset/CROP \
+  --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 \
+  --seed 42 --parallel 20 \
+  --exclude "CLASS1,CLASS2,..."
+```
+
+Creates `Prepared_Dataset/{Crop}/{Class}/{part}/img.jpg` (refs) and `Prepared_Dataset/{Crop}_test/{Class}/img.jpg` (test). Check for classes with 0 test images and add them to the exclude list.
+
+### 4. Generate part index
+
+Build `part_index.md` from the prepared ref folder structure. This maps plant parts to disease classes so the agent can narrow candidates.
+
+```bash
+python -c "
+from pathlib import Path
+ref_dir = Path('CyberVisionAg/Prepared_Dataset/CROP')
+test_dir = Path('CyberVisionAg/Prepared_Dataset/CROP_test')
+test_classes = set(d.name for d in test_dir.iterdir() if d.is_dir())
+parts = {}
+for cls_dir in sorted(ref_dir.iterdir()):
+    if not cls_dir.is_dir() or cls_dir.name not in test_classes: continue
+    for part_dir in cls_dir.iterdir():
+        if part_dir.is_dir() and part_dir.name not in ('rejected', 'test', 'merged'):
+            parts.setdefault(part_dir.name, []).append(cls_dir.name)
+with open(ref_dir / 'part_index.md', 'w') as f:
+    f.write('# Plant Part -> Disease Classes\n\n')
+    f.write('Use this to narrow candidates based on the plant part visible in the test image.\n')
+    for part in sorted(parts):
+        f.write(f'\n## {part} ({len(parts[part])} classes)\n')
+        for cls in sorted(parts[part]):
+            f.write(f'- {cls}\n')
+"
+```
+
+### 5. Add crop to run_sweeps.sh
+
+Add a case block in `setup_crop()` with DATASET, EXCLUDE, KB_SOURCES, REF_DIR, TEST_DIR, PART_INDEX. See the soybean block as a template.
+
+### 6. Run the sweep
+
+```bash
+bash CyberVisionAg/open_agentic/run_sweeps.sh status CROPNAME
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing CROPNAME
+bash CyberVisionAg/open_agentic/run_sweeps.sh results CROPNAME
+```
+
+### Notes
+
+- Keep the exclude list consistent across prepare_dataset and run_sweeps.sh.
+- The sweep is resumable (`run-missing` skips completed configs).
+- Approximate costs: KB generation ~$1-2, data preparation ~$3-5, full sweep ~$0 (subscription).
+
+---
+
+# Development Notes & Experiments
+
+> Everything below documents the development process, experiment results, and lessons learned. For getting started, see the sections above.
+
+---
 
 ## Development Approach — Iterative with Feedback
 
@@ -1527,88 +1640,6 @@ For soybean, the sweep automatically uses the prepared dataset (`--ref-dir`, `--
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test
 python -m CyberVisionAg.open_agentic.inspect_dataset --dataset Soybean_Diseases --split test --crop-class Anthracnose
 ```
-
----
-
-## Adding a new crop (checklist)
-
-All commands from AgCrawler root, with conda env `vl-reasoning` active and `.env` sourced.
-
-**Inputs**: A folder of raw images organized as `{class_name}/img.jpg`. Can be anywhere (e.g., `Data/Corn/`, `CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases/`).
-
-**Outputs**: `Prepared_Dataset/{Crop}/` (refs with part subfolders), `Prepared_Dataset/{Crop}_test/` (test images), sweep results in `results/open_agentic/`.
-
-### 1. Generate internet KB
-
-```bash
-python -m disease_registry.pipeline --crop CROP --track internet \
-  --disease-dir /path/to/raw/images
-```
-
-Produces `disease_registry/outputs/{Crop}_internet.xlsx`. Already done for: Soybean, Corn, Mango, Tomato.
-
-### 2. Inspect raw data, decide exclude list
-
-Browse class folders, check image counts, identify duplicates or ambiguous classes. Use `inspect_dataset.py` for visual grids if the data is in `Curated_Local_Dataset/`. Otherwise just `ls` the folders.
-
-### 3. Prepare dataset
-
-Uses KB descriptions to filter images (match/reject), tag plant parts, and split into ref + test sets.
-
-```bash
-python -m CyberVisionAg.open_agentic.prepare_dataset \
-  --input-dir /path/to/raw/images \
-  --output-dir CyberVisionAg/Prepared_Dataset/CROP \
-  --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 \
-  --seed 42 --parallel 20 \
-  --exclude "CLASS1,CLASS2,..."
-```
-
-Creates `Prepared_Dataset/{Crop}/{Class}/{part}/img.jpg` (refs) and `Prepared_Dataset/{Crop}_test/{Class}/img.jpg` (test). Check for classes with 0 test images and add them to the exclude list.
-
-### 4. Generate part index
-
-Build `part_index.md` from the prepared ref folder structure. This maps plant parts to disease classes so the agent can narrow candidates.
-
-```bash
-python -c "
-from pathlib import Path
-ref_dir = Path('CyberVisionAg/Prepared_Dataset/CROP')
-test_dir = Path('CyberVisionAg/Prepared_Dataset/CROP_test')
-test_classes = set(d.name for d in test_dir.iterdir() if d.is_dir())
-parts = {}
-for cls_dir in sorted(ref_dir.iterdir()):
-    if not cls_dir.is_dir() or cls_dir.name not in test_classes: continue
-    for part_dir in cls_dir.iterdir():
-        if part_dir.is_dir() and part_dir.name not in ('rejected', 'test', 'merged'):
-            parts.setdefault(part_dir.name, []).append(cls_dir.name)
-with open(ref_dir / 'part_index.md', 'w') as f:
-    f.write('# Plant Part -> Disease Classes\n\n')
-    f.write('Use this to narrow candidates based on the plant part visible in the test image.\n')
-    for part in sorted(parts):
-        f.write(f'\n## {part} ({len(parts[part])} classes)\n')
-        for cls in sorted(parts[part]):
-            f.write(f'- {cls}\n')
-"
-```
-
-### 5. Add crop to run_sweeps.sh
-
-Add a case block in `setup_crop()` with DATASET, EXCLUDE, KB_SOURCES, REF_DIR, TEST_DIR, PART_INDEX. See the soybean block as a template.
-
-### 6. Run the sweep
-
-```bash
-bash CyberVisionAg/open_agentic/run_sweeps.sh status CROPNAME
-bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing CROPNAME
-bash CyberVisionAg/open_agentic/run_sweeps.sh results CROPNAME
-```
-
-### Notes
-
-- Keep the exclude list consistent across prepare_dataset and run_sweeps.sh.
-- The sweep is resumable (`run-missing` skips completed configs).
-- Approximate costs: KB generation ~$1-2, data preparation ~$3-5, full sweep ~$0 (subscription).
 
 ---
 
