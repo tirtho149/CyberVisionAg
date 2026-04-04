@@ -207,15 +207,14 @@ def main():
     print("  NOTE: main.tex needs \\usepackage{tcolorbox} for trace boxes.")
     print()
 
-    # ── In-text trace: one correct example, soybean, internet KB, k=4 ────
-    intext_key = None
-    correct, incorrect = find_examples("Soybean_Diseases", "internet", "sonnet", 4)
-    if correct:
-        intext_key = ("Soybean_Diseases", "internet", "sonnet", 4, correct[0])
-        tex = trace_to_tex(*intext_key)
+    # ── In-text trace: hardcoded example that demonstrates anatomical narrowing ────
+    # Frogeye_leaf_spot at k=8/sonnet/internet: uses part_index, correct, 0.93 confidence
+    intext_key = ("Soybean_Diseases", "internet", "sonnet", 8, "Frogeye_leaf_spot__Soybean_Dise_21")
+    tex = trace_to_tex(*intext_key)
+    if tex:
         out = TRACES_OUT / "trace_intext.tex"
         out.write_text(tex)
-        print(f"  In-text trace (correct): {correct[0]} → {out.name}")
+        print(f"  In-text trace: Frogeye_leaf_spot__Soybean_Dise_21 (k=8, sonnet, internet) → {out.name}")
 
     # ── Appendix traces: ~10 across crops/configs ────────────────────────
     appendix_configs = [
