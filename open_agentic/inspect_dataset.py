@@ -17,7 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 CYBERVISION_DIR = SCRIPT_DIR.parent
 PROJECT_ROOT = CYBERVISION_DIR.parent
 DATASET_ROOT = CYBERVISION_DIR / "Curated_Local_Dataset"
-REGISTRY_OUTPUTS = PROJECT_ROOT / "disease_registry" / "outputs"
+REGISTRY_OUTPUTS = CYBERVISION_DIR / "disease_registry" / "outputs"
 
 EXCLUDE = {
     ".DS_Store", "Diaporthe_2015_Kanawha", "Green_stem",
@@ -28,21 +28,20 @@ EXCLUDE = {
 def load_kb(dataset: str) -> dict[str, str]:
     """Load KB visual descriptions from xlsx."""
     crop = dataset.replace("_Diseases", "").replace("_Disease", "")
+    path = REGISTRY_OUTPUTS / crop / "internet.xlsx"
     kb = {}
-    for name in [crop, crop.capitalize(), crop.lower()]:
-        path = REGISTRY_OUTPUTS / f"{name}_internet.xlsx"
-        if path.exists():
-            wb = openpyxl.load_workbook(path, read_only=True)
-            ws = wb.active
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                disease = str(row[0]).strip() if row[0] else ""
-                visual = str(row[4]).strip() if len(row) > 4 and row[4] else ""
-                parts = str(row[3]).strip() if len(row) > 3 and row[3] else ""
-                if disease:
-                    entry = f"Parts: {parts}\n{visual}" if parts else visual
-                    kb[disease] = entry if entry.strip() else "No KB entry"
-            wb.close()
-            break
+    if not path.exists():
+        return kb
+    wb = openpyxl.load_workbook(path, read_only=True)
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        disease = str(row[0]).strip() if row[0] else ""
+        visual = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+        parts = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+        if disease:
+            entry = f"Parts: {parts}\n{visual}" if parts else visual
+            kb[disease] = entry if entry.strip() else "No KB entry"
+    wb.close()
     return kb
 
 

@@ -31,7 +31,7 @@ DATASET_ROOT = CYBERVISION_DIR / "Curated_Local_Dataset"
 TRAIN_DIR = DATASET_ROOT / "train"
 TEST_DIR = DATASET_ROOT / "test"
 SYMPTOMS_FILE = CYBERVISION_DIR / "disease_symptoms_crop_wise.md"
-REGISTRY_OUTPUTS = PROJECT_ROOT / "disease_registry" / "outputs"
+REGISTRY_OUTPUTS = CYBERVISION_DIR / "disease_registry" / "outputs"
 RESULTS_DIR = CYBERVISION_DIR / "results" / "open_agentic"
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -54,9 +54,9 @@ def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -
             return None
         return _extract_crop_section(SYMPTOMS_FILE, dataset_name)
 
-    # local or internet → read from xlsx
+    # local or internet → read from per-crop folder
     crop = dataset_name.replace("_Diseases", "").replace("_Disease", "")
-    xlsx_path = REGISTRY_OUTPUTS / f"{crop}_{symptom_source}.xlsx"
+    xlsx_path = REGISTRY_OUTPUTS / crop / f"{symptom_source}.xlsx"
     if not xlsx_path.exists():
         print(f"  WARNING: {xlsx_path} not found, proceeding without KB")
         return None
@@ -84,8 +84,8 @@ def kb_coverage(symptom_source: str, dataset_name: str, classes: list[str]) -> d
         return {cls: False for cls in classes}
 
     if symptom_source in ("local", "internet"):
-        crop = dataset_name.split("_")[0]
-        xlsx_path = REGISTRY_OUTPUTS / f"{crop}_{symptom_source}.xlsx"
+        crop = dataset_name.replace("_Diseases", "").replace("_Disease", "")
+        xlsx_path = REGISTRY_OUTPUTS / crop / f"{symptom_source}.xlsx"
         if not xlsx_path.exists():
             return {cls: False for cls in classes}
         import openpyxl

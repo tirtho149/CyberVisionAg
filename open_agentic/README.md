@@ -95,8 +95,8 @@ All KB sources are **filtered to the target crop only** (e.g., soybean). Never s
 | Source | Description | Origin |
 |--------|-------------|--------|
 | `none` | No KB — agent uses only reference images | — |
-| `local` | PDF-extracted symptom descriptions | `disease_registry/outputs/Soybean_local.xlsx` |
-| `internet` | Web-extracted symptom descriptions | `disease_registry/outputs/Soybean_internet.xlsx` |
+| `local` | PDF-extracted symptom descriptions | `disease_registry/outputs/Soybean/local.xlsx` |
+| `internet` | Web-extracted symptom descriptions | `disease_registry/outputs/Soybean/internet.xlsx` |
 
 The comparison tests whether curated KB (local from PDF, internet from web) outperforms images-only (none). GPT-generated KB (`disease_symptoms_crop_wise.md`) is excluded — unverifiable, and experiments show it adds cost without clear benefit.
 
@@ -151,8 +151,7 @@ CyberVisionAg/open_agentic/
 ### Run commands
 
 ```bash
-# IMPORTANT: run from AgCrawler/ root
-cd /Users/muhammadarbabarshad/build2026-local/AgCrawler
+# Run from CyberVisionAg/
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
@@ -160,20 +159,20 @@ set -a && source .env && set +a
 EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
 
 # Quick smoke test (2 classes, 1 image each)
-python -m CyberVisionAg.open_agentic.eval --symptom-source local --quick-test 2
+python -m open_agentic.eval --symptom-source local --quick-test 2
 
 # 27-class eval (clean set) — agentic + local KB
-PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+PYTHONUNBUFFERED=1 python -m open_agentic.eval \
   --symptom-source local --images-per-class 3 --k 4 --parallel 12 --seed 42 \
   --exclude "$EXCLUDE"
 
 # 27-class eval — agentic + no KB
-PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+PYTHONUNBUFFERED=1 python -m open_agentic.eval \
   --symptom-source none --images-per-class 3 --k 4 --parallel 12 --seed 42 \
   --exclude "$EXCLUDE"
 
 # 27-class eval — few-shot baseline
-PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.few_shot \
+PYTHONUNBUFFERED=1 python -m open_agentic.few_shot \
   --images-per-class 3 --k 4 --parallel 12 --seed 42 \
   --exclude "$EXCLUDE"
 ```
@@ -190,9 +189,9 @@ To resume: read this README, check the latest experiment, and continue from the 
 
 ## Adding a New Crop (checklist)
 
-All commands from AgCrawler root, with conda env `vl-reasoning` active and `.env` sourced.
+All commands from `CyberVisionAg/`, with conda env `vl-reasoning` active and `.env` sourced.
 
-**Inputs**: A folder of raw images organized as `{class_name}/img.jpg`. Can be anywhere (e.g., `Data/Corn/`, `CyberVisionAg/Curated_Local_Dataset/train/Corn_Diseases/`).
+**Inputs**: A folder of raw images organized as `{class_name}/img.jpg`. Can be anywhere (e.g., `Curated_Local_Dataset/train/Corn_Diseases/`).
 
 **Outputs**: `Prepared_Dataset/{Crop}/` (refs with part subfolders), `Prepared_Dataset/{Crop}_test/` (test images), sweep results in `results/open_agentic/`.
 
@@ -203,7 +202,7 @@ python -m disease_registry.pipeline --crop CROP --track internet \
   --disease-dir /path/to/raw/images
 ```
 
-Produces `disease_registry/outputs/{Crop}_internet.xlsx`. Already done for: Soybean, Corn, Mango, Tomato.
+Produces `disease_registry/outputs/{Crop}/internet.xlsx`. Already done for: Soybean, Corn, Mango_Leaf, Tomato.
 
 ### 2. Inspect raw data, decide exclude list
 
@@ -320,7 +319,7 @@ This pipeline is built **one piece at a time**, tested at each step, with metric
 ### Phase 3: Scale, baselines, and refinement (in progress)
 - [x] Few-shot baseline (Experiment 14) — agentic + local KB beats few-shot 47% vs 27%
 - [ ] Dataset cleanup — remove duplicate/junk classes (see below), run on clean set
-- [ ] Generate KB (local + internet xlsx) for clean dataset via disease_registry pipeline (see [disease_registry/README.md](../../disease_registry/README.md) for instructions)
+- [ ] Generate KB (local + internet xlsx) for clean dataset via disease_registry pipeline (see [disease_registry/README.md](../disease_registry/README.md) for instructions)
 - [ ] Full clean-dataset eval (none / local / internet + few-shot)
 - [ ] Investigate Diaporthe problem — are test images genuinely ambiguous?
 - [ ] Multi-reference per class (agent sees diverse training examples)
@@ -338,7 +337,7 @@ The raw 32-class Soybean_Diseases has duplicates and junk:
 | Vague | Top_Dieback | Review — may overlap with other classes |
 | Overlapping | Fusarium vs Fusarium_healthy_vs_infected | Keep Fusarium only |
 
-Clean set: ~26 classes. Copy to `Curated_Local_Dataset/{train,test}/Soybean_Clean/`, then generate KB xlsx files via the disease_registry pipeline. See [disease_registry/README.md](../../disease_registry/README.md) for pipeline instructions on building local (PDF) and internet (web) knowledge bases.
+Clean set: ~26 classes. Copy to `Curated_Local_Dataset/{train,test}/Soybean_Clean/`, then generate KB xlsx files via the disease_registry pipeline. See [disease_registry/README.md](../disease_registry/README.md) for pipeline instructions on building local (PDF) and internet (web) knowledge bases.
 
 ## Experiment Log
 

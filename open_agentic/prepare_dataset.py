@@ -25,7 +25,7 @@ import openpyxl
 SCRIPT_DIR = Path(__file__).resolve().parent
 CYBERVISION_DIR = SCRIPT_DIR.parent
 PROJECT_ROOT = CYBERVISION_DIR.parent
-REGISTRY_OUTPUTS = PROJECT_ROOT / "disease_registry" / "outputs"
+REGISTRY_OUTPUTS = CYBERVISION_DIR / "disease_registry" / "outputs"
 
 EXCLUDE = {
     ".DS_Store", "Diaporthe_2015_Kanawha", "Green_stem",
@@ -59,26 +59,25 @@ TAG_SCHEMA = {
 def load_kb(dataset: str) -> dict[str, str]:
     """Load KB descriptions from internet xlsx."""
     crop = dataset.replace("_Diseases", "").replace("_Disease", "")
-    for name in [crop, crop.capitalize(), crop.lower()]:
-        path = REGISTRY_OUTPUTS / f"{name}_internet.xlsx"
-        if path.exists():
-            wb = openpyxl.load_workbook(path, read_only=True)
-            ws = wb.active
-            kb = {}
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                disease = str(row[0]).strip() if row[0] else ""
-                visual = str(row[4]).strip() if len(row) > 4 and row[4] else ""
-                parts = str(row[3]).strip() if len(row) > 3 and row[3] else ""
-                if disease:
-                    entry = ""
-                    if parts:
-                        entry += f"Affected parts: {parts}\n"
-                    if visual:
-                        entry += f"Visual symptoms: {visual}"
-                    kb[disease] = entry.strip() if entry.strip() else "No description available"
-            wb.close()
-            return kb
-    return {}
+    path = REGISTRY_OUTPUTS / crop / "internet.xlsx"
+    if not path.exists():
+        return {}
+    wb = openpyxl.load_workbook(path, read_only=True)
+    ws = wb.active
+    kb = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        disease = str(row[0]).strip() if row[0] else ""
+        visual = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+        parts = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+        if disease:
+            entry = ""
+            if parts:
+                entry += f"Affected parts: {parts}\n"
+            if visual:
+                entry += f"Visual symptoms: {visual}"
+            kb[disease] = entry.strip() if entry.strip() else "No description available"
+    wb.close()
+    return kb
 
 
 def load_image_b64(path: str) -> str:
