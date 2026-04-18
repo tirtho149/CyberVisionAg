@@ -213,9 +213,9 @@ Browse class folders, check image counts, identify duplicates or ambiguous class
 Uses KB descriptions to filter images (match/reject), tag plant parts, and split into ref + test sets.
 
 ```bash
-python -m CyberVisionAg.open_agentic.prepare_dataset \
+python -m open_agentic.prepare_dataset \
   --input-dir /path/to/raw/images \
-  --output-dir CyberVisionAg/Prepared_Dataset/CROP \
+  --output-dir Prepared_Dataset/CROP \
   --max-per-part 5 --test-per-class 3 --max-inspect-per-class 20 \
   --seed 42 --parallel 20 \
   --exclude "CLASS1,CLASS2,..."
