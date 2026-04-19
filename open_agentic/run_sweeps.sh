@@ -106,6 +106,10 @@ done
 # Model ablation: haiku + opus at internet/k=8
 AGENTIC_CONFIGS+=("haiku,internet,8")
 AGENTIC_CONFIGS+=("opus,internet,8")
+# Gemini ablation: flash + pro at internet/k=8 (thinking budget overridden via
+# CyberVisionAg/.gemini/settings.json — 0 for Flash, 128 min for Pro).
+AGENTIC_CONFIGS+=("gemini-flash,internet,8")
+AGENTIC_CONFIGS+=("gemini-pro,internet,8")
 # Deduplicate (sonnet,internet,8 already exists from the loop)
 
 FEWSHOT_K_VALUES=(0 1 4 8 16)
@@ -252,11 +256,11 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
 
     echo "=== Table 2: Model Ablation — ${DATASET} (internet KB, k=8) ==="
     echo ""
-    printf "%-10s | %15s\n" "Model" "Accuracy"
-    printf "%-10s-|-%15s\n" "----------" "---------------"
-    for model in haiku sonnet opus; do
+    printf "%-12s | %15s\n" "Model" "Accuracy"
+    printf "%-12s-|-%15s\n" "------------" "---------------"
+    for model in haiku sonnet opus gemini-flash gemini-pro; do
         r=$(read_accuracy "${model}" internet 8)
-        printf "%-10s | %15s\n" "${model}" "${r}"
+        printf "%-12s | %15s\n" "${model}" "${r}"
     done
     echo ""
 fi

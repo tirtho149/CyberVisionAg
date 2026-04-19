@@ -40,6 +40,18 @@ _ACTIVE_MODEL = MODEL  # set by main() from CLI args
 TIMEOUT_S = 300  # 5 minutes per image
 ENV_STRIP_PREFIXES = ("CLAUDE", "CURSOR", "MCP_CONNECTION", "VSCODE", "ELECTRON")
 
+def _resolve_backend(model: str) -> tuple[str, str]:
+    """Return (backend, concrete_model_id). Backend is 'claude' or 'gemini'.
+
+    For gemini, the model name (e.g. 'gemini-flash', 'gemini-pro') is passed
+    through unchanged and resolved to the underlying 2.5-flash/2.5-pro via the
+    customAliases in CyberVisionAg/.gemini/settings.json (which also disables
+    thinking to match Claude's default).
+    """
+    if model.startswith("gemini"):
+        return "gemini", model
+    return "claude", model
+
 
 # ── KB loading ─────────────────────────────────────────────────────────────────
 
@@ -417,6 +429,31 @@ def _run_agent(
     attractor_guide_dir: str | None = None,
     part_index_path: str | None = None,
 ) -> dict:
+    """Dispatch to the appropriate backend based on _ACTIVE_MODEL."""
+    backend, concrete_model = _resolve_backend(_ACTIVE_MODEL)
+    if backend == "gemini":
+        return _run_gemini_agent(
+            test_image_path, ground_truth, classes, ref_images, kb_text, k, timeout,
+            concrete_model, attractor_guide_dir, part_index_path,
+        )
+    return _run_claude_agent(
+        test_image_path, ground_truth, classes, ref_images, kb_text, k, timeout,
+        concrete_model, attractor_guide_dir, part_index_path,
+    )
+
+
+def _run_claude_agent(
+    test_image_path: str,
+    ground_truth: str,
+    classes: list[str],
+    ref_images: dict[str, str],
+    kb_text: str | None,
+    k: int | None,
+    timeout: int,
+    model: str,
+    attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
+) -> dict:
     """Spawn claude -p subprocess and parse results."""
     system_prompt = build_system_prompt(
         attractor_guide_dir=attractor_guide_dir,
@@ -433,7 +470,7 @@ def _run_agent(
         "--output-format", "stream-json",
         "--verbose",
         "--no-session-persistence",
-        "--model", _ACTIVE_MODEL,
+        "--model", model,
         "--allowedTools", "Read",
         "--append-system-prompt", system_prompt,
     ]
@@ -494,6 +531,185 @@ def _run_agent(
         "trace": trace,
         "error": None,
     }
+
+
+def _run_gemini_agent(
+    test_image_path: str,
+    ground_truth: str,
+    classes: list[str],
+    ref_images: dict[str, str],
+    kb_text: str | None,
+    k: int | None,
+    timeout: int,
+    model: str,
+    attractor_guide_dir: str | None = None,
+    part_index_path: str | None = None,
+) -> dict:
+    """Spawn gemini -p subprocess and parse results."""
+    if not os.environ.get("GEMINI_API_KEY"):
+        return _make_result(ground_truth, error="GEMINI_API_KEY not set")
+
+    system_prompt = build_system_prompt(
+        attractor_guide_dir=attractor_guide_dir,
+        part_index_path=part_index_path,
+        k=k,
+    )
+    user_message = build_user_message(
+        test_image_path, classes, ref_images, kb_text, k,
+        attractor_guide_dir=attractor_guide_dir,
+    )
+    combined_prompt = f"{system_prompt}\n\n{user_message}"
+
+    cmd = [
+        "gemini", "-p", combined_prompt,
+        "--output-format", "stream-json",
+        "--approval-mode", "yolo",
+        "--model", model,
+        # Allow reads from anywhere: test images live in /tmp (filename-leak guard),
+        # collages in $TMPDIR, ref images in CyberVisionAg, etc.
+        "--include-directories", "/",
+    ]
+
+    env = _clean_env_gemini()
+    proc = None
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,  # drop YOLO warnings + startup noise
+            env=env,
+            cwd=str(CYBERVISION_DIR),  # avoid root .gitignore blocking image reads
+            start_new_session=True,
+        )
+        stdout_bytes, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if proc:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            proc.wait()
+        return _make_result(ground_truth, error="timeout")
+    except Exception as e:
+        return _make_result(ground_truth, error=str(e))
+
+    if proc.returncode != 0:
+        return _make_result(ground_truth, error=f"gemini exit code {proc.returncode}")
+
+    stdout = stdout_bytes.decode(errors="replace")
+    trace, result_event = _parse_gemini_stream(stdout)
+
+    result_text = result_event.get("result", "")
+    prediction = _parse_prediction(result_text, classes)
+
+    # Debug: on failure (no prediction), dump raw stdout for post-mortem.
+    if prediction.get("prediction") is None or not trace:
+        debug_dir = Path("/tmp/gemini_debug")
+        debug_dir.mkdir(exist_ok=True)
+        import uuid
+        with open(debug_dir / f"fail_{uuid.uuid4().hex[:8]}.log", "w") as _f:
+            _f.write(f"GROUND_TRUTH: {ground_truth}\nMODEL: {model}\n---STDOUT---\n{stdout}\n")
+
+    refs_viewed = _count_ref_reads(trace, test_image_path)
+    is_correct = prediction.get("prediction") == ground_truth
+
+    return {
+        "test_image": ground_truth,
+        "ground_truth": ground_truth,
+        "prediction": prediction.get("prediction", "UNKNOWN"),
+        "confidence": prediction.get("confidence", 0.0),
+        "reasoning": prediction.get("reasoning", ""),
+        "correct": is_correct,
+        "num_turns": result_event.get("num_turns", 0),
+        "cost_usd": 0.0,  # TODO: compute from token counts + pricing table
+        "duration_ms": result_event.get("duration_ms", 0),
+        "refs_viewed": refs_viewed,
+        "trace": trace,
+        "error": None,
+    }
+
+
+def _clean_env_gemini() -> dict[str, str]:
+    """Env for gemini subprocess: strip Claude/VSCode vars, keep GEMINI_API_KEY."""
+    strip_prefixes = ENV_STRIP_PREFIXES + ("GOOGLE_",)
+    env = {
+        k: v for k, v in os.environ.items()
+        if not any(k.startswith(p) for p in strip_prefixes)
+    }
+    # Keep only GEMINI_API_KEY; strip other GEMINI_* that may interfere
+    for k in list(env.keys()):
+        if k.startswith("GEMINI_") and k != "GEMINI_API_KEY":
+            env.pop(k, None)
+    env["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY", "")
+    env.pop("ANTHROPIC_API_KEY", None)
+    return env
+
+
+def _parse_gemini_stream(stdout: str) -> tuple[list[dict], dict]:
+    """Parse Gemini stream-json NDJSON into (trace, synthetic_result_event).
+
+    Normalizes to Claude-compatible shape so downstream counters/parsers work:
+    - trace entries: {type: "text", content: ...} or {type: "tool_use", tool: "Read", input: {...}}
+    - result_event: {result: text, num_turns, duration_ms, total_cost_usd}
+    """
+    trace: list[dict] = []
+    result_stats: dict = {}
+    assistant_buffer = ""  # accumulate streamed deltas per assistant run
+    assistant_active = False
+
+    def flush_assistant():
+        nonlocal assistant_buffer, assistant_active
+        if assistant_buffer.strip():
+            trace.append({"type": "text", "content": assistant_buffer.strip()})
+        assistant_buffer = ""
+        assistant_active = False
+
+    for line in stdout.strip().split("\n"):
+        if not line.strip() or not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        etype = obj.get("type")
+        if etype == "message" and obj.get("role") == "assistant":
+            assistant_buffer += obj.get("content", "")
+            assistant_active = True
+        elif etype == "tool_use":
+            if assistant_active:
+                flush_assistant()
+            tool_name = obj.get("tool_name", "")
+            # Normalize read_file -> Read for downstream compatibility
+            norm_tool = "Read" if tool_name == "read_file" else tool_name
+            params = obj.get("parameters", {}) or {}
+            trace.append({
+                "type": "tool_use",
+                "tool": norm_tool,
+                "input": params,
+            })
+        elif etype == "result":
+            if assistant_active:
+                flush_assistant()
+            result_stats = obj.get("stats", {}) or {}
+
+    # Flush any trailing assistant content
+    if assistant_active:
+        flush_assistant()
+
+    # Final text is the last assistant run in trace
+    final_text = ""
+    for entry in reversed(trace):
+        if entry.get("type") == "text":
+            final_text = entry.get("content", "")
+            break
+
+    result_event = {
+        "result": final_text,
+        "num_turns": result_stats.get("tool_calls", 0) + 1,
+        "duration_ms": result_stats.get("duration_ms", 0),
+        "total_cost_usd": 0.0,  # Gemini does not report cost; compute later
+    }
+    return trace, result_event
 
 
 def _make_result(ground_truth: str, error: str) -> dict:
@@ -807,7 +1023,9 @@ def main():
                 old_file.unlink()
 
     # Print config
-    print("OPEN AGENTIC CLASSIFICATION (claude -p)")
+    _backend, _ = _resolve_backend(_ACTIVE_MODEL)
+    _binary = "gemini -p" if _backend == "gemini" else "claude -p"
+    print(f"OPEN AGENTIC CLASSIFICATION ({_binary})")
     print(f"  Model         : {_ACTIVE_MODEL}")
     print(f"  Symptom source: {args.kb_file or args.symptom_source}")
     print(f"  Dataset       : {args.dataset}")
