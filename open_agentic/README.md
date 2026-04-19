@@ -21,16 +21,20 @@ The hypothesis: a free-form reasoning agent with access to symptoms and referenc
 │  Harness  (eval.py)                             │
 │  - Loads dataset (train/test splits)            │
 │  - Loads KB (default / local / internet xlsx)   │
-│  - Spawns N parallel `claude -p` subprocesses   │
-│  - Parses stream-json traces                    │
+│  - Dispatches by --model prefix:                │
+│      claude* → `claude -p`                      │
+│      gemini* → `gemini -p`                      │
+│  - Spawns N parallel subprocesses               │
+│  - Parses stream-json traces (normalized)       │
 │  - Computes metrics (accuracy, turns, cost)     │
 │  - Writes per-image logs + summary              │
 └──────────────┬──────────────────────────────────┘
                │  one subprocess per test image
                ▼
 ┌─────────────────────────────────────────────────┐
-│  Claude -p Agent  (one per image)               │
-│  - Model: claude-sonnet-4-6                     │
+│  Agent  (one per image)                         │
+│  - Model: sonnet/haiku/opus or                  │
+│           gemini-flash/gemini-pro               │
 │  - Allowed tools: Read (for images + files)     │
 │  - System prompt: task description + constraints │
 │  - User message: test image + class list + KB   │
@@ -175,7 +179,26 @@ PYTHONUNBUFFERED=1 python -m open_agentic.eval \
 PYTHONUNBUFFERED=1 python -m open_agentic.few_shot \
   --images-per-class 3 --k 4 --parallel 12 --seed 42 \
   --exclude "$EXCLUDE"
+
+# Gemini backends — pass --model gemini-flash or gemini-pro
+PYTHONUNBUFFERED=1 python -m open_agentic.eval \
+  --model gemini-flash --symptom-source internet \
+  --images-per-class 3 --k 8 --parallel 12 --seed 42 \
+  --exclude "$EXCLUDE"
 ```
+
+### Gemini backend
+
+`eval.py` dispatches by model prefix: `--model gemini-flash` or `--model gemini-pro` spawns `gemini -p` instead of `claude -p`. Trace format is normalized (`read_file` → `Read`) so downstream tools work unchanged.
+
+**Setup:**
+1. Install Gemini CLI: `npm install -g @google/gemini-cli`
+2. Add `GEMINI_API_KEY=...` to `CyberVisionAg/.env` (gitignored)
+3. `CyberVisionAg/.gemini/settings.json` already configures the thinking-budget workaround for [gemini-cli issue #24290](https://github.com/google-gemini/gemini-cli/issues/24290):
+   - `gemini-flash`: `thinkingBudget: 0` (disabled — any positive value triggers intermittent silent empty responses)
+   - `gemini-pro`: `thinkingBudget: 128` (API minimum — Pro rejects `0` with `INVALID_ARGUMENT`)
+
+This is the closest available configuration to Claude's default (no extended thinking). Do not raise Flash's budget above 0 without re-verifying — it will silent-fail on complex prompts.
 
 ### Session recovery
 
