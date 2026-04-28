@@ -81,6 +81,11 @@ def table_main_results():
         ("Soybean_Diseases", "Soybean (25)", ["none", "internet"]),
         ("Corn_Diseases", "Corn (30)", ["none", "internet"]),
         ("Mango_Leaf_Disease", "Mango (4)", ["none", "internet"]),
+        ("Sugarcane_Diseases", "Sugarcane (9)", ["none", "internet"]),
+        ("Banana_Diseases", "Banana (7)", ["none", "internet"]),
+        ("Cauliflower_Diseases", "Cauliflower (4)", ["none", "internet"]),
+        ("Orange_Diseases", "Orange (2)", ["none", "internet"]),
+        ("Coffee_Diseases", "Coffee (2)", ["none", "internet"]),
     ]
     ks = [0, 1, 4, 8, 16]
     method_labels = {
@@ -131,7 +136,7 @@ def table_main_results():
         lines.append(r"\midrule")
 
     # Average improvement (pp) over each crop's own baseline, averaged across crops
-    # Only for methods present in all 3 crops: "none" and "internet"
+    # Only for methods present in all crops: "none" and "internet"
     avg_methods = [
         ("none", "Agent (no KB)"),
         ("internet", "Agent + internet KB"),
@@ -184,6 +189,11 @@ def table_model_ablation():
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Sugarcane_Diseases", "Sugarcane"),
+        ("Banana_Diseases", "Banana"),
+        ("Cauliflower_Diseases", "Cauliflower"),
+        ("Orange_Diseases", "Orange"),
+        ("Coffee_Diseases", "Coffee"),
     ]
     models = [("haiku", "Haiku"), ("sonnet", "Sonnet"), ("opus", "Opus")]
 
@@ -227,6 +237,11 @@ def table_appendix_delta():
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Sugarcane_Diseases", "Sugarcane"),
+        ("Banana_Diseases", "Banana"),
+        ("Cauliflower_Diseases", "Cauliflower"),
+        ("Orange_Diseases", "Orange"),
+        ("Coffee_Diseases", "Coffee"),
     ]
     ks = [0, 1, 4, 8, 16]
 
@@ -295,6 +310,11 @@ def table_fewshot_comparison():
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Sugarcane_Diseases", "Sugarcane"),
+        ("Banana_Diseases", "Banana"),
+        ("Cauliflower_Diseases", "Cauliflower"),
+        ("Orange_Diseases", "Orange"),
+        ("Coffee_Diseases", "Coffee"),
     ]
     ks = [0, 1, 4, 8, 16]
 
@@ -404,11 +424,16 @@ def table_attractor_guide():
 # ── Table: Cost analysis ─────────────────────────────────────────────────────
 
 def table_cost_analysis():
-    """Cost per image across k values for Sonnet + internet KB, all 3 crops."""
+    """Cost per image across k values for Sonnet + internet KB, all 7 crops."""
     crops = [
         ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Sugarcane_Diseases", "Sugarcane"),
+        ("Banana_Diseases", "Banana"),
+        ("Cauliflower_Diseases", "Cauliflower"),
+        ("Orange_Diseases", "Orange"),
+        ("Coffee_Diseases", "Coffee"),
     ]
     ks = [0, 1, 4, 8, 16]
 

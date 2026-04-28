@@ -15,14 +15,22 @@
 #   status        Show which configs have results
 #   clean         Remove ALL results for this crop
 #
-# Crops:
-#   soybean       Soybean_Diseases (27 clean classes, KB: none/local/internet)
-#   corn          Corn_Diseases (31 clean classes, KB: none/internet)
+# Crops (all 10 in SageQualityChecker/crop_disease_subset.csv):
+#   Prepared datasets exist:   soybean, corn, mango, tomato, sugarcane, banana, cauliflower, orange, coffee
+#   Need data preparation:     wheat
+#
+# Quality filter: INCORRECT + QUESTIONABLE disease labels from
+# SageQualityChecker/disease_label_subset_report.json are HARDCODED into each
+# crop's EXCLUDE below (previously appended at runtime via quality_exclude.py).
+# To refresh after a new judge run:
+#   for c in Soybean Corn Mango Tomato Sugarcane Banana Cauliflower Coffee Orange Wheat; do
+#     python open_agentic/quality_exclude.py --crop "$c" --existing "<manual-part>"
+#   done
 #
 # Examples:
 #   bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing soybean
 #   bash CyberVisionAg/open_agentic/run_sweeps.sh results corn
-#   bash CyberVisionAg/open_agentic/run_sweeps.sh status soybean
+#   bash CyberVisionAg/open_agentic/run_sweeps.sh status sugarcane
 
 set -uo pipefail
 
@@ -38,52 +46,153 @@ setup_crop() {
     REF_DIR=""
     TEST_DIR=""
     PART_INDEX=""
+    # Crop name as it appears in disease_label_subset_report.json (Title Case).
+    # Leave empty to skip quality-report filtering for this crop.
+    QUALITY_CROP=""
 
     case "${CROP}" in
         soybean)
             DATASET="Soybean_Diseases"
-            EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus"
+            EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback,Diaporthe,Soybean_Dwarf_Mosaic_Virus,Bacterial_Pustule_Of_Soybean_Disease,Cercospora,Cercospora_Fungi,Diaporthe_Fungus,Fusarium_Disease,Herbicide_Injury,Iron_Deficiency_Chlorosis,Phomopsis,Phyllosticta_Leaf_Spot,Phytophthora,Potassium_Deficiency,Pythium,Pythium_Diseases,Rhizobium_Bacteria,Rhizoctonia,Root_And_Stem_Rot,Sclerotinia_Timber_Rot,Septoria_Leaf_Blotch,Soybean_Dwarf_Mosaic_Virus_2012,Wildfire_Of_Tobacco,Xylaria_Necrophora_Garcia-Aroca"
             KB_SOURCES=("none" "internet")
             # KB_SOURCES=("none" "local" "internet")  # local commented out: not needed for paper
             REF_DIR="CyberVisionAg/Prepared_Dataset/Soybean"
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Soybean_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Soybean/part_index.md"
+            QUALITY_CROP="Soybean"
             ;;
         corn)
             DATASET="Corn_Diseases"
-            EXCLUDE="Anthracnose_Ear_Infection,Leaf_Blight,Leaf_Spot,Maize_Lethal_Necrosis,Penicillium_On_Seedling,Pythium,Rhizoctonia,Rust,Smut,Ear_Rots,General_And_Mixed_Ear_Rots,General_And_Mixed_Stalk_Rots,Genetic_Flecking_Or_Striping,Genetic_Streaking,Diplodia,Chocolate_Spot,Barley_Yellow_Dwarf_Virus,Cladosporium_Ear_Rot,Crown_Rot,Damping_Off,Downy_Mildew,Maize_White_Line_Mosaic,Nigrospora_Ear_Rot,Penicillium_Ear_Rot,Pythium_Stalk_Rot,Rhizopus_Stolonifer,Root_Rot,Trichoderma_Stalk_Rot"
+            EXCLUDE="Anthracnose_Ear_Infection,Leaf_Blight,Leaf_Spot,Maize_Lethal_Necrosis,Penicillium_On_Seedling,Pythium,Rhizoctonia,Rust,Smut,Ear_Rots,General_And_Mixed_Ear_Rots,General_And_Mixed_Stalk_Rots,Genetic_Flecking_Or_Striping,Genetic_Streaking,Diplodia,Chocolate_Spot,Barley_Yellow_Dwarf_Virus,Cladosporium_Ear_Rot,Crown_Rot,Damping_Off,Downy_Mildew,Maize_White_Line_Mosaic,Nigrospora_Ear_Rot,Penicillium_Ear_Rot,Pythium_Stalk_Rot,Rhizopus_Stolonifer,Root_Rot,Trichoderma_Stalk_Rot,Alternaria_Black_Molds_Stem_Cankers,Bacterial_Brown_Spot_Of_Beancanker_Of_Stone_Fruit,Bacterial_Rot_And_Blight,Brown_Spot,Cladosporium_Fungus,Dry_Rot_Of_Ears_And_Stalks_Of_Maize,Epicoccum_Fungus,Fusarium_Disease,Fusarium_Graminearum_Schwabe,Fusarium_Wilts,Gibberella_Disease,Goss,Green_Mold,Khuskia_Fungus,Pantoea,Penicillium_Fungi,Pythium_Diseases,Xanthomonas_Vasicola"
             KB_SOURCES=("none" "internet")
             REF_DIR="CyberVisionAg/Prepared_Dataset/Corn"
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Corn_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Corn/part_index.md"
+            QUALITY_CROP="Corn"
             ;;
         mango)
             DATASET="Mango_Leaf_Disease"
-            EXCLUDE="Bacterial_Canker"
+            EXCLUDE="Bacterial_Canker,Bitter_Rot_And_Anthracnose,Fungus,Pestalotiopsis_Blight,Phaeoramularia_Fungus"
             KB_SOURCES=("none" "internet")
             REF_DIR="CyberVisionAg/Prepared_Dataset/Mango_Leaf"
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Mango_Leaf_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango_Leaf/part_index.md"
             IMAGES=10  # override: use all 10 test images per class (only 4 classes)
+            QUALITY_CROP="Mango"
             ;;
         tomato)
+            # Dataset: Data/Tomato (from selected_10crops_100_fast.zip, extracted 2026-04-26).
+            # KB: outputs/Tomato/internet.xlsx (built for old Curated_Local_Dataset names;
+            # 15 of 21 classes have no KB entry — prepare_dataset uses generic Claude knowledge).
+            # Excluded: old quality-judge flags + classes with <10 images + 0-test-image class.
+            # Evaluated: 20 classes (100 test images, 5/class).
             DATASET="Tomato_Diseases"
-            EXCLUDE="Bacterial_Leaf_Spot,Leaf_Bacterial_Spot,Early_Blight_Leaf,Leaf_Late_Blight,Mold_Leaf,Leaf_Mosaic_Virus,Leaf_Yellow_Virus,Spider_Mites_Two-Spotted_Spider_Mite,Two_Spotted_Spider_Mites_Leaf,Yellow_Leaf_Curl_Virus"
+            EXCLUDE="Bacterial_Leaf_Spot,Leaf_Mosaic_Virus,Leaf_Yellow_Virus,Spider_Mites,Tomato_Leaf_Mould,Bitter_Rot_And_Anthracnose,Blossom_End_Rot,Brown_Spot,Clover_Proliferation_Phytoplasma,Diaporthe_Vexans_Gratz,Fusarium_Wilts,Phomopsis_Cankers_And_Twig_Blights,Phytoplasma,Remotididymella_Destructiva,Bacterial_Pith_Necrosis,Bacterial_Soft_Rot,Beet_Curly_Top_Virus,Fusarium_Damping-Off,Fusarium_Wilt,Phoma_Blight,Pythium_Diseases,Rhizoctonia_Damping-Off,Sclerotinia_Rots,Tomato_Leaf_Curl_Virus,Tomato_Ringspot_Virus,Alfalfa_Mosaic_Virus,Tomato_Necrotic_Dwarf_Virus,Phytophthora_Root_And_Crown_Rots"
             KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Tomato"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Tomato_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Tomato/part_index.md"
+            IMAGES=5  # override: use all 5 test images per class (20 classes = 100 total)
+            QUALITY_CROP="Tomato"
+            ;;
+        sugarcane)
+            # Dataset: sugarcane_only/Sugarcane (17 classes × 100 imgs). Prepared
+            # via prepare_dataset (15 inspect, 3 ref/part, 5 test/class). Four
+            # classes produced 0 test images and are excluded so the sweep won't
+            # crash: Brown_Rust, Eye_Spot, Leaf_Mosaic_Virus, Smut.
+            # Quality judge also drops: Banded_Chlorosis, Common_Rust, Dried_Leaves,
+            # Leaf_Mosaic_Virus, Red_Spot — appended automatically via quality_exclude.py.
+            DATASET="Sugarcane_Diseases"
+            EXCLUDE="Brown_Rust,Eye_Spot,Leaf_Mosaic_Virus,Smut,Banded_Chlorosis,Common_Rust,Dried_Leaves,Red_Spot"
+            KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Sugarcane"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Sugarcane_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Sugarcane/part_index.md"
+            QUALITY_CROP="Sugarcane"
+            ;;
+        banana)
+            # Dataset: Data/Banana (16 classes). KB: outputs/Banana/internet.xlsx
+            # (generated 2026-04-23). Prepared via prepare_dataset (15 inspect,
+            # 3 ref/part, 5 test/class). Classes with 0 test images (too few
+            # source imgs) are added to EXCLUDE so the sweep doesn't crash.
+            DATASET="Banana_Diseases"
+            EXCLUDE="Bitter_Rot_And_Anthracnose,Pestalotiopsis_Leaf_Spot,Phoma_Blight,Phyllosticta_Maculata,Pseudocercospora_Musae,Rust,Phaeoseptoria_Leaf_Spot,Phyllosticta_Leaf_Spot,Pseudocercospora_Leaf_Spot"
+            KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Banana"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Banana_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Banana/part_index.md"
+            QUALITY_CROP="Banana"
+            ;;
+        cauliflower)
+            # Dataset: Data/Cauliflower (5 classes). KB: outputs/Cauliflower/internet.xlsx
+            # (generated 2026-04-23; 4/5 matched). Prepared via prepare_dataset
+            # (15 inspect, 3 ref/part, 5 test/class). Quality judge drops
+            # Bacterial_Spot_Rot (INCORRECT) → 4 eval classes.
+            DATASET="Cauliflower_Diseases"
+            EXCLUDE="Bacterial_Spot_Rot"
+            KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Cauliflower"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Cauliflower_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Cauliflower/part_index.md"
+            QUALITY_CROP="Cauliflower"
+            ;;
+        coffee)
+            # Dataset: Data/Coffee (7 raw classes, from selected_10crops_100_fast.zip).
+            # KB: outputs/Coffee/internet.xlsx (generated 2026-04-24).
+            # Excluded: Berry_Blotch/Black_Rot/Cerscospora (low-confidence KB, no usable images),
+            # Miner/Phoma (excluded by quality judge). Leaves 2 classes: Brown_Eye_Spot, Rust.
+            # Prepared via prepare_dataset (max-per-part 3, test-per-class 5, 2026-04-25).
+            DATASET="Coffee_Diseases"
+            EXCLUDE="Berry_Blotch,Black_Rot,Cerscospora,Miner,Phoma"
+            KB_SOURCES=("none" "internet")
+            IMAGES=10  # override: use all 10 test images per class (only 2 classes)
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Coffee"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Coffee_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Coffee/part_index.md"
+            QUALITY_CROP="Coffee"
+            ;;
+        orange)
+            # Dataset: Data/Orange (7 raw classes, from selected_10crops_100_fast.zip).
+            # KB: outputs/Orange/internet.xlsx (generated 2026-04-24; Huanglongbing
+            # description relaxed after the original KB's strict "asymmetrical
+            # blotchy mottle" wording rejected all 100 source images).
+            # Quality judge flagged Whisker_Mold as QUESTIONABLE, but it has the
+            # best image coverage so we keep it in the eval; the other quality
+            # flags (Penicillium_Fungi/Fungus) have 0 usable data anyway.
+            # Classes with 0 test images after prepare_dataset are added to
+            # EXCLUDE so the sweep won't crash.
+            DATASET="Orange_Diseases"
+            EXCLUDE="Penicillium_Fungi,Penicillium_Fungus,Blue_Mold,Citrus_Blight_Disease,Green_Mold"
+            KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Orange"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Orange_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Orange/part_index.md"
+            QUALITY_CROP="Orange"
+            ;;
+        wheat)
+            # TODO: prepare dataset (Curated_Local_Dataset/train/Wheat_Diseases exists, but no prepared refs/test yet)
+            DATASET="Wheat_Diseases"
+            EXCLUDE="Alternaria_Black_Molds_Stem_Cankers,Bacterial_Brown_Spot_Of_Beancanker_Of_Stone_Fruit,Blumeria_Graminis_F,Cochliobolus_Leaf_Spot,Downy_Mildew,Fusarium_Disease,Fusarium_Graminearum_Schwabe,Fusarium_Wilts,Leaf_Spot,Leaf_Streakblack_Chaff,Parastagonospora_Nodorum,Penicillium_Fungi,Phytophthora_Root_And_Crown_Rots,Resistance_Phenotype,Root_Rot,Rust,Septoria_Leaf_Spot_And_Cankers,Smut,Sooty_Mold,Zymoseptoria_Tritici"
+            KB_SOURCES=("none" "internet")
+            QUALITY_CROP="Wheat"
             ;;
         *)
             echo "Unknown crop: ${CROP}"
-            echo "Available: soybean, corn, mango, tomato"
+            echo "Available: soybean, corn, mango, tomato, sugarcane, banana, cauliflower, coffee, orange, wheat"
             exit 1
             ;;
     esac
+
+    # Quality-judge excludes (INCORRECT + QUESTIONABLE) are hardcoded into
+    # each crop's EXCLUDE above. QUALITY_CROP is kept for reference only.
 }
 
 if [ -z "${COMMAND}" ] || [ -z "${CROP}" ]; then
     echo "Usage: $0 <command> <crop>"
     echo ""
     echo "Commands: run, run-missing, results, status, clean"
-    echo "Crops:    soybean, corn"
+    echo "Crops:    soybean, corn, mango, tomato, sugarcane,"
+    echo "          banana, cauliflower, coffee, orange, wheat"
     echo ""
     echo "Examples:"
     echo "  $0 run-missing soybean"
@@ -91,9 +200,9 @@ if [ -z "${COMMAND}" ] || [ -z "${CROP}" ]; then
     exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 setup_crop
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 
 # Build configs dynamically based on crop's KB sources

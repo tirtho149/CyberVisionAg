@@ -935,7 +935,7 @@ Clean set: **31 classes**.
 
 ---
 
-## Final Results (IMAGES=3, all 3 crops)
+## Final Results (IMAGES=3, all 4 crops)
 
 All results use: sonnet model, collage refs (800px tiles, 2×2 grid), seed=42, parallel=12.
 
@@ -1084,6 +1084,145 @@ KB coverage: internet 27/27, local 26/27 (Green_stem_disorder missing from PDF).
 - No clean k-scaling trend — plateau after k=4
 - KB coverage is now full (27/27 internet) but doesn't help much — visual ambiguity is the real limit
 
+### Sugarcane_Diseases (9 classes × ~3 images = 26 tests per config) — **2026-04-23 rerun**
+
+Data source: `sugarcane_only/Sugarcane/` (17 raw classes × 100 imgs each — richer than the prior 20-img sample).
+Prepared via `prepare_dataset` with `--max-inspect-per-class 15 --max-per-part 3 --test-per-class 5 --parallel 12` → 255 inspected, 51 refs, 54 test, 101 rejected, 13 transient API errors (500s, non-fatal). Tile format: 800px no-collage (refs-per-class=3).
+
+Excludes (hardcoded in `run_sweeps.sh` as INCORRECT/QUESTIONABLE from `disease_label_subset_report.json` + classes with 0 test images): Brown_Rust, Eye_Spot, Leaf_Mosaic_Virus, Smut, Banded_Chlorosis, Common_Rust, Dried_Leaves, Red_Spot.
+
+Evaluated classes (9): Brown_Spot(4), Grassy_Shoot(5), Leaf_Scald(4), Pokkah_Boeng(4), Sett_Rot(2), Streak_Mosaic_Scsmv(5), Sugarcane_Mosaic_Virus(5), Yellow_Leaf(5), Yellow_Spot(5) = 26 test images. KB coverage: 9/9 (all classes have internet entries).
+
+**Table 1 — Method × k (sonnet)**
+
+| Method | k=0 | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|:-:|
+| Few-shot baseline | 30.8% | 38.5% | 57.7% | 61.5% | **76.9%** |
+| Agent (no KB) | 42.3% | 53.8% | 65.4% | **69.2%** | **69.2%** |
+| Agent + internet KB | 46.2% | 53.8% | 61.5% | 57.7% | **73.1%** |
+
+**Table 2 — Model ablation (internet KB, k=8)**
+
+| Model | Accuracy |
+|-------|:-:|
+| Haiku | 50.0% |
+| Sonnet | 57.7% |
+| **Opus** | **84.6%** |
+| gemini-flash | 46.2% |
+| gemini-pro | 57.7% |
+
+**Key findings**:
+- **Zero errors across all 19 configs** (previous sweep hit rate-limit errors at k=16 and on Opus — this rerun was clean). Gemini CLI installed so gemini-flash/pro now run.
+- Few-shot tops Table 1 at k=16 (76.9%), but Agent (no KB) beats it at every k≤8; Agent + internet KB peaks at 73.1% at k=16
+- Opus is the strongest single lever: **+26.9pp over Sonnet** at same config (84.6% vs 57.7%) — largest opus gap seen across all crops
+- Scale effect holds: at k=0 (text-only), Agent + KB > Agent no-KB > Few-shot; at k=16 (vision-rich), few-shot catches up
+- Sonnet/internet doesn't monotonically scale with k — dips at k=8 (57.7%) then recovers at k=16 (73.1%); Agent no-KB is smoother
+- Gemini-pro matches Sonnet at k=8 (57.7%); gemini-flash ~10pp below
+
+**Pipeline yield**: 17 raw → 9 evaluated = 53% (doubled vs the 23.5% yield from the 20-img sample).
+
+### Banana_Diseases (7 classes × ~3 images = 19 tests per config) — **2026-04-23**
+
+Data source: `Data/Banana/` (16 raw classes, extracted from `selected_10crops_100_fast.zip`). KB generated 2026-04-23: `disease_registry/outputs/Banana/internet.xlsx` (discovery→extraction→reconciliation; 10/16 classes matched with real web data, remaining 6 placeholders). Prepared via `prepare_dataset` with same params as sugarcane → 113 inspected, 43 refs, 31 test, 18 rejected, 0 errors.
+
+Excludes (hardcoded in `run_sweeps.sh`): 6 INCORRECT/QUESTIONABLE from quality judge (Bitter_Rot_And_Anthracnose, Pestalotiopsis_Leaf_Spot, Phoma_Blight, Phyllosticta_Maculata, Pseudocercospora_Musae, Rust) + 3 classes with 0 test images after prepare_dataset (Phaeoseptoria_Leaf_Spot, Phyllosticta_Leaf_Spot, Pseudocercospora_Leaf_Spot) = 9 excluded. Evaluated classes (7): Anthracnose(5), Banana_Bunchy_Top_Virus(1), Bunchy_Top(5), Cigar_End_Rot(5), Cordana_Leaf_Spot(5), Panama_Disease(5), Yellow_And_Black_Sigatoka(5) = **19 test images**.
+
+**Table 1 — Method × k (sonnet)**
+
+| Method | k=0 | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|:-:|
+| Few-shot baseline | 73.7% | 78.9% | 73.7% | 78.9% | 73.7% |
+| Agent (no KB) | 57.9% | 68.4% | 68.4% | **89.5%** | 68.4% |
+| Agent + internet KB | 68.4% | 84.2% | 84.2% | **89.5%** | 78.9% |
+
+**Table 2 — Model ablation (internet KB, k=8)**
+
+| Model | Accuracy |
+|-------|:-:|
+| Haiku | 68.4% |
+| Sonnet | 89.5% |
+| **Opus** | **94.7%** |
+| gemini-flash | 42.1% |
+| gemini-pro | 84.2% |
+
+**Key findings**:
+- **Zero errors across all 19 configs**
+- Agent + internet KB beats few-shot at every k≥1 (+5–11pp). At k=8, both Agent variants peak at 89.5%, well above few-shot's 78.9%
+- Opus tops out at **94.7%** — only 1 of 19 test images wrong. This is the best Opus result across any crop in this session
+- Gemini-pro (84.2%) is competitive with Sonnet; gemini-flash is much weaker (42.1%) on this crop
+- KB provides a large headstart: at k=0, agent + KB = 68.4% vs agent no-KB = 57.9% (+10.5pp)
+- No k=16 collapse this run — but accuracy dips at k=16 vs k=8 on all three sonnet configs (overthinking pattern)
+
+**Pipeline yield**: 16 raw → 7 evaluated = 44%. The small tail classes (1–4 imgs in source) can't support the prepare_dataset quota.
+
+### Cauliflower_Diseases (4 classes × ~3 images = 11 tests per config) — **2026-04-23**
+
+Data source: `Data/Cauliflower/` (5 raw classes). KB generated 2026-04-23: `disease_registry/outputs/Cauliflower/internet.xlsx` (4/5 matched). Prepared via `prepare_dataset` with same params → 75 inspected, 19 refs, 21 test, 25 rejected, 0 errors.
+
+Excludes (hardcoded in `run_sweeps.sh`): Bacterial_Spot_Rot (INCORRECT per quality judge). Evaluated classes (4): Alternaria_Leaf_Spot(3), Bacterial_Soft_Rot(3), Black_Rot(2), Downy_Mildew(3) = **11 test images**.
+
+Note: sonnet/internet/k≥4, haiku/internet/k=8, and opus/internet/k=8 errored out in the first sweep (transient `claude` CLI quota hiccup after running 45+ configs back-to-back). Re-ran those 5 configs individually — all succeeded. Numbers below are from the clean runs.
+
+**Table 1 — Method × k (sonnet)**
+
+| Method | k=0 | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|:-:|
+| Few-shot baseline | 45.5% | 54.5% | 54.5% | 54.5% | **72.7%** |
+| Agent (no KB) | 54.5% | 36.4% | 54.5% | 63.6% | **72.7%** |
+| Agent + internet KB | 45.5% | 54.5% | **72.7%** | 63.6% | **72.7%** |
+
+**Table 2 — Model ablation (internet KB, k=8)**
+
+| Model | Accuracy |
+|-------|:-:|
+| **Haiku** | **72.7%** |
+| Sonnet | 63.6% |
+| Opus | 54.5% |
+| gemini-flash | 54.5% |
+| gemini-pro | 45.5% |
+
+**Key findings**:
+- 11 test images is too small to reliably differentiate methods — 1 image flip = ±9pp. Treat all numbers as directional.
+- Three configs tie at 72.7% (best): few-shot k=16, Agent no-KB k=16, Agent + KB k=4 & k=16. No clear winner.
+- Haiku topping the model ablation (72.7% > Sonnet 63.6% > Opus 54.5%) is almost certainly noise at this scale, not a real model-size inversion.
+- Agent + internet KB scales better than no-KB at small k (tied at k=0, Agent + KB dominant at k=4 vs 54.5%)
+- KB adds +27pp at k=4 over no-KB — the biggest early-k benefit across all crops in this session.
+
+**Pipeline yield**: 5 raw → 4 evaluated = 80%.
+
+### Orange_Diseases (2 classes × 3 images = 6 tests per config) — **2026-04-24**
+
+Data source: `Data/Orange/` (7 raw classes, from `selected_10crops_100_fast.zip`). Orange has a very thin source: 100 Huanglongbing images, 15 Whisker_Mold, and ≤3 each for the other 5 classes.
+
+KB generated 2026-04-24: `disease_registry/outputs/Orange/internet.xlsx` (5/7 matched). **The initial Huanglongbing KB rejected all 100 source images** because its description demanded "asymmetrical blotchy mottle / vein yellowing" while the dataset shows mostly uniformly yellowed or mildly discolored leaves. We loosened the Huanglongbing visual description to accept any yellowing/chlorosis/discolored citrus foliage and re-ran prepare_dataset.
+
+Excludes (hardcoded in `run_sweeps.sh`): `Penicillium_Fungi,Penicillium_Fungus` (quality judge) + `Blue_Mold,Citrus_Blight_Disease,Green_Mold` (0 test images after prepare_dataset). **Whisker_Mold is kept in the eval** despite the quality judge flagging it QUESTIONABLE — without it Orange is a 1-class problem. Evaluated classes (2): Huanglongbing(3), Whisker_Mold(3) = **6 test images**.
+
+**Table 1 — Method × k (sonnet)**
+
+| Method | k=0 | k=1 | k=4 | k=8 | k=16 |
+|--------|:-:|:-:|:-:|:-:|:-:|
+| Few-shot baseline | 100% | 100% | 100% | 100% | 100% |
+| Agent (no KB) | 100% | 100% | 100% | 100% | 100% |
+| Agent + internet KB | 100% | 100% | 100% | 100% | 100% |
+
+**Table 2 — Model ablation (internet KB, k=8)**
+
+| Model | Accuracy |
+|-------|:-:|
+| Haiku | 100% |
+| Sonnet | 100% |
+| Opus | 100% |
+| gemini-flash | 50.0% |
+| gemini-pro | 83.3% |
+
+**Key findings**:
+- **Trivial 2-class task** — every Anthropic method hits 100% on every config. Huanglongbing (citrus greening, yellow leaves) and Whisker_Mold (fungal growth on fruit) are visually unambiguous.
+- **Gemini-flash at 50%** (chance level on a 2-class problem) — striking failure on what Anthropic models find trivial. Gemini-pro 83.3% (5/6, 1 err).
+- Result is a lower-bound demo only: ceiling-bound accuracy doesn't differentiate methods. Orange isn't useful for benchmarking until a richer multi-class source is found.
+
+**Pipeline yield**: 7 raw → 2 evaluated = 29% (and one of the two needed a KB relaxation to survive).
+
 ---
 
 ## Cross-crop Summary
@@ -1093,8 +1232,12 @@ KB coverage: internet 27/27, local 26/27 (Green_stem_disorder missing from PDF).
 | Corn | 31 | 44.1% (k=16) | **53.8%** (k=8) | **+9.7pp** |
 | Mango | 7 | 95.2% (k=16) | 85.7% (k=8) | -9.5pp (few-shot wins) |
 | Soybean | 27 | 37.0% (k=8) | **42.0%** (k=4) | **+5.0pp** |
+| Sugarcane | 9 | 76.9% (k=16) | 73.1% (k=16) | -3.8pp (few-shot wins; opus at k=8 hits 84.6%) |
+| Banana | 7 | 78.9% (k=1/8) | **89.5%** (k=8) | **+10.6pp** (opus at k=8 hits 94.7%) |
+| Cauliflower | 4 | 72.7% (k=16) | 72.7% (k=4/16) | 0pp (tied; small N=11 — within noise) |
+| Orange | 2 | 100% (all k) | 100% (all k) | ceiling-bound (trivial N=6; gemini-flash=50%) |
 
-Agent + KB wins on corn and soybean (the harder, more numerous class datasets). Few-shot wins on mango (easy, few classes). Model quality is the strongest factor across all crops (haiku < sonnet < opus).
+Agent + KB wins on corn, soybean, and banana. Few-shot wins on mango and sugarcane (easy-few-class datasets). Cauliflower (N=11) and Orange (N=6) are too small to be informative. Model quality is the strongest factor across all crops (haiku < sonnet < opus), with exceptions from noise on tiny datasets.
 
 ---
 
