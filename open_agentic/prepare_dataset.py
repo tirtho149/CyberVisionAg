@@ -156,6 +156,43 @@ def tag_image(
     }
 
 
+def generate_part_index(dataset: str, all_tags: list, ref_quotas: dict,
+                       total_inspected: int, total_ref: int, total_test: int) -> str:
+    """Generate part_index.md documentation organized by plant part."""
+    from collections import defaultdict
+
+    # Build disease list per part
+    diseases_by_part = defaultdict(set)
+    part_image_count = defaultdict(int)
+
+    for cls_name in ref_quotas.keys():
+        for part in ref_quotas[cls_name]:
+            if ref_quotas[cls_name][part] > 0:
+                diseases_by_part[part].add(cls_name)
+                part_image_count[part] += ref_quotas[cls_name][part]
+
+    crop = dataset.replace("_Diseases", "").replace("_Disease", "")
+
+    # Sort parts by image count (descending)
+    parts_sorted = sorted(diseases_by_part.keys(), key=lambda x: -part_image_count[x])
+
+    md = f"""# Organ Part Index — {crop}
+
+Use this to narrow candidates based on the plant part visible in the test image.
+
+"""
+
+    for part in parts_sorted:
+        diseases = sorted(diseases_by_part[part])
+        count = len(diseases)
+        md += f"{part} ({count} classes)\n"
+        for disease in diseases:
+            md += f"{disease}\n"
+        md += "\n"
+
+    return md
+
+
 def main():
     parser = argparse.ArgumentParser(description="Filter and tag dataset images using KB")
     parser.add_argument("--input-dir", required=True, help="Source folder with class subfolders")
@@ -367,6 +404,12 @@ def main():
     meta_path.parent.mkdir(parents=True, exist_ok=True)
     meta_path.write_text(json.dumps(meta, indent=2))
     print(f"\nMetadata saved: {meta_path}")
+
+    # Generate part_index.md
+    part_index_md = generate_part_index(dataset, all_tags, ref_quotas, total_inspected, total_ref, total_test)
+    part_index_path = output_dir / "part_index.md"
+    part_index_path.write_text(part_index_md)
+    print(f"Part index saved: {part_index_path}")
 
 
 if __name__ == "__main__":
