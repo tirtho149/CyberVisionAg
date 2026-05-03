@@ -15,25 +15,25 @@ echo ""
 get_diseases() {
     local crop="$1"
     case "$crop" in
-        Banana)
+        banana)
             echo "Anthracnose Cigar_End_Rot Bunchy_Top Panama_Disease Cordana_Leaf_Spot Yellow_And_Black_Sigatoka"
             ;;
-        Cauliflower)
+        cauliflower)
             echo "Black_Rot Bacterial_Soft_Rot Alternaria_Leaf_Spot Downy_Mildew"
             ;;
-        Coffee)
+        coffee)
             echo "Berry_Blotch Brown_Eye_Spot Cerscospora Phoma Miner"
             ;;
-        Orange)
+        orange)
             echo "Whisker_Mold"
             ;;
-        Sugarcane)
+        sugarcane)
             echo "Brown_Spot Pokkah_Boeng Sett_Rot Sugarcane_Mosaic_Virus Common_Rust Dried_Leaves Leaf_Scald Streak_Mosaic_Scsmv Yellow_Spot Banded_Chlorosis Eye_Spot Grassy_Shoot Red_Spot Yellow_Leaf"
             ;;
-        Tomato)
+        tomato)
             echo "Tomato_Spotted_Wilt_Virus Southern_Blight Powdery_Mildew Bacterial_Speck_Of_Tomato Cucumber_Mosaic_Virus Verticillium_Wilt Leaf_Mold Septoria_Leaf_Blotch"
             ;;
-        Wheat)
+        wheat)
             echo "Bacterial_Leaf_Streak_Black_Chaff Stem_Rust Loose_Smut Septoria_Leaf_Blotch Powdery_Mildew Resistance_Phenotype__Moderately_Resistant Resistance_Phenotype__Moderately_Susceptible Resistance_Phenotype__Resistant Resistance_Phenotype__Susceptible Stripe_Rust"
             ;;
         *)
@@ -42,8 +42,8 @@ get_diseases() {
     esac
 }
 
-# Available crops
-crops="Banana Cauliflower Coffee Orange Sugarcane Tomato Wheat"
+# Available crops (lowercase for open_agentic/run_sweeps.sh)
+crops="banana cauliflower coffee orange sugarcane tomato wheat"
 
 # Default family (can be overridden with argument)
 FAMILY="${1:-claude}"
@@ -69,7 +69,9 @@ for crop in $crops; do
     diseases=$(get_diseases "$crop")
     num_classes=$(echo $diseases | wc -w)
     total_classes=$((total_classes + num_classes))
-    echo "  $crop: $num_classes classes"
+    # Capitalize crop name for display
+    crop_display=$(echo "$crop" | sed 's/^./\U&/')
+    echo "  $crop_display: $num_classes classes"
     for disease in $diseases; do
         echo "    - $disease"
     done
@@ -106,8 +108,9 @@ crop_pids=()
 for crop in $crops; do
     diseases=$(get_diseases "$crop")
     num_diseases=$(echo $diseases | wc -w)
+    crop_display=$(echo "$crop" | sed 's/^./\U&/')
 
-    echo "🚀 Starting $crop ($num_diseases classes)..."
+    echo "🚀 Starting $crop_display ($num_diseases classes)..."
 
     total=$((total + 1))
 
