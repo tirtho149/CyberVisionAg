@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 # Run evaluation sweeps for crop-disease classes from crop_disease_final_min5test.csv
 # Hardcoded classes: 48 crop-disease pairs with ≥5 test samples
-
-if [ -z "$BASH_VERSION" ]; then
-    echo "Error: This script requires bash. Run with: bash $0 [claude|gemini]"
-    exit 1
-fi
+# Compatible with bash 3.x+ (no associative arrays)
 
 set -uo pipefail
 
@@ -15,33 +11,39 @@ python3 -m pip install --quiet Pillow opencv-python numpy pandas 2>/dev/null || 
 echo "Dependencies ready"
 echo ""
 
-# Hardcoded crop-disease classes from crop_disease_final_min5test.csv
-# Using bash 4+ associative arrays
-declare -A crop_diseases
-
-# Banana (6 classes)
-crop_diseases[Banana]="Anthracnose Cigar_End_Rot Bunchy_Top Panama_Disease Cordana_Leaf_Spot Yellow_And_Black_Sigatoka"
-
-# Cauliflower (4 classes)
-crop_diseases[Cauliflower]="Black_Rot Bacterial_Soft_Rot Alternaria_Leaf_Spot Downy_Mildew"
-
-# Coffee (5 classes)
-crop_diseases[Coffee]="Berry_Blotch Brown_Eye_Spot Cerscospora Phoma Miner"
-
-# Orange (1 class)
-crop_diseases[Orange]="Whisker_Mold"
-
-# Sugarcane (10 classes)
-crop_diseases[Sugarcane]="Brown_Spot Pokkah_Boeng Sett_Rot Sugarcane_Mosaic_Virus Common_Rust Dried_Leaves Leaf_Scald Streak_Mosaic_Scsmv Yellow_Spot Banded_Chlorosis Eye_Spot Grassy_Shoot Red_Spot Yellow_Leaf"
-
-# Tomato (8 classes)
-crop_diseases[Tomato]="Tomato_Spotted_Wilt_Virus Southern_Blight Powdery_Mildew Bacterial_Speck_Of_Tomato Cucumber_Mosaic_Virus Verticillium_Wilt Leaf_Mold Septoria_Leaf_Blotch"
-
-# Wheat (8 classes)
-crop_diseases[Wheat]="Bacterial_Leaf_Streak_Black_Chaff Stem_Rust Loose_Smut Septoria_Leaf_Blotch Powdery_Mildew Resistance_Phenotype__Moderately_Resistant Resistance_Phenotype__Moderately_Susceptible Resistance_Phenotype__Resistant Resistance_Phenotype__Susceptible Stripe_Rust"
+# Function to get diseases for a crop (compatible with older bash)
+get_diseases() {
+    local crop="$1"
+    case "$crop" in
+        Banana)
+            echo "Anthracnose Cigar_End_Rot Bunchy_Top Panama_Disease Cordana_Leaf_Spot Yellow_And_Black_Sigatoka"
+            ;;
+        Cauliflower)
+            echo "Black_Rot Bacterial_Soft_Rot Alternaria_Leaf_Spot Downy_Mildew"
+            ;;
+        Coffee)
+            echo "Berry_Blotch Brown_Eye_Spot Cerscospora Phoma Miner"
+            ;;
+        Orange)
+            echo "Whisker_Mold"
+            ;;
+        Sugarcane)
+            echo "Brown_Spot Pokkah_Boeng Sett_Rot Sugarcane_Mosaic_Virus Common_Rust Dried_Leaves Leaf_Scald Streak_Mosaic_Scsmv Yellow_Spot Banded_Chlorosis Eye_Spot Grassy_Shoot Red_Spot Yellow_Leaf"
+            ;;
+        Tomato)
+            echo "Tomato_Spotted_Wilt_Virus Southern_Blight Powdery_Mildew Bacterial_Speck_Of_Tomato Cucumber_Mosaic_Virus Verticillium_Wilt Leaf_Mold Septoria_Leaf_Blotch"
+            ;;
+        Wheat)
+            echo "Bacterial_Leaf_Streak_Black_Chaff Stem_Rust Loose_Smut Septoria_Leaf_Blotch Powdery_Mildew Resistance_Phenotype__Moderately_Resistant Resistance_Phenotype__Moderately_Susceptible Resistance_Phenotype__Resistant Resistance_Phenotype__Susceptible Stripe_Rust"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
 
 # Available crops
-crops=( Banana Cauliflower Coffee Orange Sugarcane Tomato Wheat )
+crops="Banana Cauliflower Coffee Orange Sugarcane Tomato Wheat"
 
 # Default family (can be overridden with argument)
 FAMILY="${1:-claude}"
@@ -63,16 +65,17 @@ echo "=========================================="
 echo ""
 echo "Available crops and classes:"
 total_classes=0
-for crop in "${crops[@]}"; do
-    num_classes=$(echo ${crop_diseases[$crop]} | wc -w)
+for crop in $crops; do
+    diseases=$(get_diseases "$crop")
+    num_classes=$(echo $diseases | wc -w)
     total_classes=$((total_classes + num_classes))
     echo "  $crop: $num_classes classes"
-    for disease in ${crop_diseases[$crop]}; do
+    for disease in $diseases; do
         echo "    - $disease"
     done
 done
 echo ""
-echo "Total: ${#crops[@]} crops, $total_classes disease classes"
+echo "Total: 7 crops, $total_classes disease classes"
 echo ""
 
 read -p "Continue? (y/N) " confirm
@@ -85,7 +88,7 @@ echo ""
 echo "⚡ Fast mode: Running parallel evaluation sweeps (1 image/class)"
 echo "Expected duration: ~10-15 minutes"
 echo ""
-echo "Starting evaluation sweeps for ${#crops[@]} crop(s) in parallel..."
+echo "Starting evaluation sweeps for 7 crop(s) in parallel..."
 echo "Timestamp: $(date)"
 echo ""
 
@@ -100,9 +103,8 @@ pids=()
 crop_pids=()
 
 # Launch all crops in parallel
-for crop in "${crops[@]}"; do
-    # Get diseases for this crop
-    diseases=${crop_diseases[$crop]}
+for crop in $crops; do
+    diseases=$(get_diseases "$crop")
     num_diseases=$(echo $diseases | wc -w)
 
     echo "🚀 Starting $crop ($num_diseases classes)..."
@@ -121,7 +123,7 @@ for crop in "${crops[@]}"; do
 done
 
 echo ""
-echo "All ${#crops[@]} crops started. Waiting for completion..."
+echo "All 7 crops started. Waiting for completion..."
 echo "Individual logs: /tmp/{crop_name}_sweep.log"
 echo ""
 
