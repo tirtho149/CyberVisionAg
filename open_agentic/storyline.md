@@ -273,6 +273,7 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 - [x] Strengthened Section 3.2 with anatomical index reference to Figure 2
 - [x] Moved dataset license table to top of appendix, restyled to match paper conventions
 - [x] Added cost analysis table (auto-generated via generate_tables.py from summary JSONs)
+- [x] Figure 2 v3: rebalanced toward dataset/curation. **Two expert phases now split across the two curation rows**: (1) `Expert Dedupe` between `Raw images` and `Image Filtering` (cross-source class-name dedupe), (2) `Expert Audit` between `Reconciliation` and `Disease KB` (per-field verbatim-evidence audit). Annotated `Raw images` with `$\sim$840K, multi-source` and `Disease KB` with `335 crops · 1{,}251 diseases` (numbers from Table 1). Renamed inference group to `Demonstrated Agentic Evaluation`. Added visible open-ended loop back-arrow `Compare → KB Lookup` with `repeat until k refs viewed`. Swapped test image to mango Anthracnose, fixed prediction text to `Anthracnose`. Added trace strip (Step 6/7/8) using verbatim Step 7 quote from `traces/trace_appendix_13.tex`. Section 4 prose updated to describe ONLY the evidence audit (no naming-dedupe claim). Section 3.2 prose updated to describe the cross-source class-name dedupe step before image filtering.
 - [ ] Cross-check all inline numbers against summary JSONs
 - [ ] Update open_agentic/README.md with final results table
 - [ ] Commit and push all changes
