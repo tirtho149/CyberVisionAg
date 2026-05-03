@@ -1,0 +1,74 @@
+# Organ Part Index — Wheat
+
+Use this to narrow candidates based on the plant part visible in the test image.
+
+leaf (19 classes)
+Bacterial_Leaf_Streak_Black_Chaff
+Bacterial_Streak
+Barley_Yellow_Dwarf_Virus
+Cephalosporium_Stripe
+Powdery_Mildew
+Resistance_Phenotype__Moderately_Resistant
+Resistance_Phenotype__Moderately_Susceptible
+Resistance_Phenotype__Resistant
+Resistance_Phenotype__Susceptible
+Septoria_Leaf_Blotch
+Stem_Rust
+Stripe_Rust
+Tan_Spot
+Wheat_Barley_Yellow_Dwarf
+Wheat_Cephalosporium_Stripe
+Wheat_Leaf_Rust
+Wheat_Stem_Rust
+Wheat_Streak_Mosaic_Virus
+Wheat_Stripe_Rust
+
+whole_plant (16 classes)
+Barley_Yellow_Dwarf_Virus
+Cephalosporium_Stripe
+Dwarf_Bunt
+Foot_Rot
+Head_Scab
+Loose_Smut
+Powdery_Mildew
+Pythium_Diseases
+Rhizoctonia_Damping-Off
+Sharp_Eyespot
+Stem_Rust
+Take-All_Root_Rot
+Wheat_Barley_Yellow_Dwarf
+Wheat_Leaf_Rust
+Wheat_Stem_Rust
+Wheat_Streak_Mosaic_Virus
+
+stem (9 classes)
+Bacterial_Leaf_Streak_Black_Chaff
+Cephalosporium_Stripe
+Eyespot
+Head_Scab
+Loose_Smut
+Sharp_Eyespot
+Stem_Rust
+Take-All_Root_Rot
+Wheat_Stem_Rust
+
+seed (9 classes)
+Alternaria_Blight
+Bacterial_Leaf_Streak_Black_Chaff
+Common_Bunt
+Dwarf_Bunt
+Glume_Blotch
+Head_Scab
+Karnal_Bunt
+Loose_Smut
+Wheat_Bunt
+
+root (3 classes)
+Pythium_Diseases
+Rhizoctonia_Damping-Off
+Take-All_Root_Rot
+
+pod (2 classes)
+Bacterial_Leaf_Streak_Black_Chaff
+Head_Scab
+

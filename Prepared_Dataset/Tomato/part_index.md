@@ -1,0 +1,65 @@
+# Organ Part Index — Tomato
+
+Use this to narrow candidates based on the plant part visible in the test image.
+
+leaf (13 classes)
+Bacterial_Canker_And_Wilt_Of_Tomato
+Bacterial_Speck_Of_Tomato
+Cucumber_Mosaic_Virus
+Early_Blight
+Gray_Mold
+Late_Blight
+Leaf_Mold
+Phytophthora_Blight
+Powdery_Mildew
+Septoria_Leaf_Blotch
+Target_Spot
+Tomato_Spotted_Wilt_Virus
+Verticillium_Wilt
+
+stem (11 classes)
+Alternaria_Black_Molds_Stem_Cankers
+Anthracnose
+Bacterial_Canker_And_Wilt_Of_Tomato
+Bacterial_Wilt
+Gray_Mold
+Late_Blight
+Phytophthora_Blight
+Rhizopus_Soft_Rots
+Sclerotinia_Timber_Rot
+Southern_Bacterial_Wilt
+Southern_Blight
+
+whole_plant (12 classes)
+Bacterial_Canker_And_Wilt_Of_Tomato
+Bacterial_Wilt
+Cucumber_Mosaic_Virus
+Early_Blight
+Late_Blight
+Phytophthora_Blight
+Rhizopus_Soft_Rots
+Sclerotinia_Timber_Rot
+Southern_Bacterial_Wilt
+Southern_Blight
+Tomato_Spotted_Wilt_Virus
+Verticillium_Wilt
+
+pod (7 classes)
+Anthracnose
+Bacterial_Canker_And_Wilt_Of_Tomato
+Gray_Mold
+Late_Blight
+Phytophthora_Blight
+Rhizopus_Soft_Rots
+Tomato_Spotted_Wilt_Virus
+
+seed (4 classes)
+Anthracnose
+Rhizopus_Soft_Rots
+Sclerotinia_Timber_Rot
+Tomato_Spotted_Wilt_Virus
+
+root (2 classes)
+Sclerotinia_Timber_Rot
+Southern_Bacterial_Wilt
+
