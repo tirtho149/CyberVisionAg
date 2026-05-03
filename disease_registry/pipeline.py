@@ -31,6 +31,7 @@ def run_pipeline(
     disease_dir: str | None = None,
     quick: bool = False,
     resume_from: str | None = None,
+    exclude: str | None = None,
 ) -> dict:
     """Run local, internet, or both pipelines.
 
@@ -41,6 +42,7 @@ def run_pipeline(
         disease_dir: Path to image directory with disease folders
         quick: Quick mode (fewer sources, shorter timeouts)
         resume_from: Resume internet pipeline from a specific stage
+        exclude: Comma-separated list of disease names to exclude
     """
     print(f"\n{'#'*60}")
     print(f"# DISEASE REGISTRY — {crop.upper()} (track: {track})")
@@ -51,6 +53,14 @@ def run_pipeline(
     if disease_dir:
         disease_names = load_disease_names_from_dir(disease_dir, crop)
         print(f"  Loaded {len(disease_names)} known diseases from directory")
+
+        # Filter out excluded diseases
+        if exclude:
+            excluded_list = [e.strip() for e in exclude.split(",")]
+            original_count = len(disease_names)
+            disease_names = [d for d in disease_names if d not in excluded_list]
+            excluded_count = original_count - len(disease_names)
+            print(f"  Excluded {excluded_count} diseases, keeping {len(disease_names)}")
 
     local_registry = None
     internet_registry = None
@@ -123,6 +133,8 @@ def main():
     parser.add_argument("--resume-from", default=None,
                         choices=["discovery", "extraction", "reconciliation"],
                         help="Resume internet pipeline from stage")
+    parser.add_argument("--exclude", default=None,
+                        help="Comma-separated list of disease names to exclude from KB generation")
     args = parser.parse_args()
 
     run_pipeline(
@@ -132,6 +144,7 @@ def main():
         disease_dir=args.disease_dir,
         quick=args.quick,
         resume_from=args.resume_from,
+        exclude=args.exclude,
     )
 
 
