@@ -76,41 +76,79 @@ if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
 fi
 
 echo ""
-echo "Starting evaluation sweeps for ${#crops[@]} crop(s)..."
+echo "⚡ Fast mode: Running parallel evaluation sweeps (1 image/class)"
+echo "Expected duration: ~10-15 minutes"
 echo ""
+echo "Starting evaluation sweeps for ${#crops[@]} crop(s) in parallel..."
+echo "Timestamp: $(date)"
+echo ""
+
+# Modify open_agentic/run_sweeps.sh to use 1 image per class for speed
+echo "Configuring for fast evaluation (IMAGES=1)..."
+sed -i.bak 's/^IMAGES=5/IMAGES=1/' open_agentic/run_sweeps.sh
 
 total=0
 completed=0
+failed=0
+pids=()
+crop_pids=()
 
+# Launch all crops in parallel
 for crop in "${crops[@]}"; do
-    echo "=========================================="
-    echo ">>> Running sweep for $crop..."
-    echo "=========================================="
-
     # Get diseases for this crop
     diseases=${crop_diseases[$crop]}
     num_diseases=$(echo $diseases | wc -w)
 
-    echo "Classes: $num_diseases"
-    echo ""
+    echo "🚀 Starting $crop ($num_diseases classes)..."
 
     total=$((total + 1))
 
-    bash open_agentic/run_sweeps.sh run-missing "$crop" "$FAMILY"
+    # Run in background and capture PID
+    (
+        bash open_agentic/run_sweeps.sh run-missing "$crop" "$FAMILY" > /tmp/${crop}_sweep.log 2>&1
+        exit $?
+    ) &
 
-    if [ $? -eq 0 ]; then
-        completed=$((completed + 1))
-        echo "✓ $crop completed"
-    else
-        echo "✗ $crop failed"
-    fi
-    echo ""
+    pid=$!
+    pids+=($pid)
+    crop_pids+=("$crop:$pid")
 done
 
+echo ""
+echo "All ${#crops[@]} crops started. Waiting for completion..."
+echo "Individual logs: /tmp/{crop_name}_sweep.log"
+echo ""
+
+# Wait for all background jobs and collect results
+for i in "${!pids[@]}"; do
+    pid=${pids[$i]}
+    crop_name=$(echo ${crop_pids[$i]} | cut -d: -f1)
+
+    wait $pid
+    result=$?
+
+    if [ $result -eq 0 ]; then
+        echo "✓ $crop_name completed successfully"
+        completed=$((completed + 1))
+    else
+        echo "✗ $crop_name failed (exit code: $result)"
+        failed=$((failed + 1))
+    fi
+done
+
+echo ""
 echo "=========================================="
 echo "SUMMARY"
 echo "=========================================="
 echo "Total crops: $total"
 echo "Completed: $completed"
-echo "Failed: $((total - completed))"
+echo "Failed: $failed"
+echo "Completed at: $(date)"
+echo ""
+echo "Results stored in: results/open_agentic/"
 echo "=========================================="
+
+# Restore original script
+if [ -f open_agentic/run_sweeps.sh.bak ]; then
+    mv open_agentic/run_sweeps.sh.bak open_agentic/run_sweeps.sh
+fi
