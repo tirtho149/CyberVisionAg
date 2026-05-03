@@ -1,6 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run evaluation sweeps for crop-disease classes from crop_disease_final_min5test.csv
 # Hardcoded classes: 48 crop-disease pairs with ≥5 test samples
+
+if [ -z "$BASH_VERSION" ]; then
+    echo "Error: This script requires bash. Run with: bash $0 [claude|gemini]"
+    exit 1
+fi
 
 set -uo pipefail
 
@@ -11,6 +16,7 @@ echo "Dependencies ready"
 echo ""
 
 # Hardcoded crop-disease classes from crop_disease_final_min5test.csv
+# Using bash 4+ associative arrays
 declare -A crop_diseases
 
 # Banana (6 classes)
