@@ -12,6 +12,9 @@
 
 set -uo pipefail
 
+# Install required dependencies
+python3 -m pip install --quiet Pillow opencv-python numpy pandas 2>/dev/null || true
+
 EXCLUDE="Diaporthe_2015_Kanawha,Green_stem,Fusarium_healthy_vs_infected,Stem_Canker,Top_Dieback"
 MODELS=("haiku" "sonnet" "opus")
 K_VALUES=(1 2 4 8)

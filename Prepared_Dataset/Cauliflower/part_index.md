@@ -7,9 +7,11 @@ Alternaria_Leaf_Spot
 Black_Rot
 Downy_Mildew
 
-whole_plant (1 classes)
+whole_plant (2 classes)
 Bacterial_Soft_Rot
+Bacterial_Spot_Rot
 
-stem (1 classes)
+stem (2 classes)
 Bacterial_Soft_Rot
+Bacterial_Spot_Rot
 

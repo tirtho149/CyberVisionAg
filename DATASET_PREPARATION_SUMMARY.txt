@@ -1,0 +1,90 @@
+================================================================================
+DATASET PREPARATION SUMMARY - Test Set Allocation
+================================================================================
+
+FORMULA:
+  test_per_class = max(50 // kept_classes, 5)
+
+  Where:
+    - total_classes = raw disease classes in Raw_Crops/{crop}_Diseases
+    - excluded_classes = quality-judge flagged diseases (INCORRECT + QUESTIONABLE)
+    - kept_classes = total_classes - excluded_classes
+    - test_per_class = minimum 5 samples per class, up to 50 // kept_classes
+
+================================================================================
+
+CROP                | Total Classes | Excluded | Kept | test-per-class | Expected Test Total
+================================================================================
+Tomato              |            48 |       28 |   20 |              5 |               100
+Sugarcane           |            17 |        8 |    9 |              5 |                45
+Banana              |            16 |        9 |    7 |              7 |                49
+Cauliflower         |             5 |        1 |    4 |             12 |                48
+Coffee              |             7 |        5 |    2 |             25 |                50
+Orange              |             7 |        5 |    2 |             25 |                50
+Wheat               |            53 |       20 |   33 |              5 |               165
+================================================================================
+
+EXCLUDED DISEASE CLASSES BY CROP:
+================================================================================
+
+Tomato (28 excluded):
+  Bacterial_Leaf_Spot, Leaf_Mosaic_Virus, Leaf_Yellow_Virus, Spider_Mites,
+  Tomato_Leaf_Mould, Bitter_Rot_And_Anthracnose, Blossom_End_Rot, Brown_Spot,
+  Clover_Proliferation_Phytoplasma, Diaporthe_Vexans_Gratz, Fusarium_Wilts,
+  Phomopsis_Cankers_And_Twig_Blights, Phytoplasma, Remotididymella_Destructiva,
+  Bacterial_Pith_Necrosis, Bacterial_Soft_Rot, Beet_Curly_Top_Virus,
+  Fusarium_Damping-Off, Fusarium_Wilt, Phoma_Blight, Pythium_Diseases,
+  Rhizoctonia_Damping-Off, Sclerotinia_Rots, Tomato_Leaf_Curl_Virus,
+  Tomato_Ringspot_Virus, Alfalfa_Mosaic_Virus, Tomato_Necrotic_Dwarf_Virus,
+  Phytophthora_Root_And_Crown_Rots
+
+Sugarcane (8 excluded):
+  Brown_Rust, Eye_Spot, Leaf_Mosaic_Virus, Smut, Banded_Chlorosis,
+  Common_Rust, Dried_Leaves, Red_Spot
+
+Banana (9 excluded):
+  Bitter_Rot_And_Anthracnose, Pestalotiopsis_Leaf_Spot, Phoma_Blight,
+  Phyllosticta_Maculata, Pseudocercospora_Musae, Rust, Phaeoseptoria_Leaf_Spot,
+  Phyllosticta_Leaf_Spot, Pseudocercospora_Leaf_Spot
+
+Cauliflower (1 excluded):
+  Bacterial_Spot_Rot
+
+Coffee (5 excluded):
+  Berry_Blotch, Black_Rot, Cerscospora, Miner, Phoma
+
+Orange (5 excluded):
+  Penicillium_Fungi, Penicillium_Fungus, Blue_Mold, Citrus_Blight_Disease,
+  Green_Mold
+
+Wheat (20 excluded):
+  Alternaria_Black_Molds_Stem_Cankers,
+  Bacterial_Brown_Spot_Of_Beancanker_Of_Stone_Fruit, Blumeria_Graminis_F,
+  Cochliobolus_Leaf_Spot, Downy_Mildew, Fusarium_Disease,
+  Fusarium_Graminearum_Schwabe, Fusarium_Wilts, Leaf_Spot,
+  Leaf_Streakblack_Chaff, Parastagonospora_Nodorum, Penicillium_Fungi,
+  Phytophthora_Root_And_Crown_Rots, Resistance_Phenotype, Root_Rot, Rust,
+  Septoria_Leaf_Spot_And_Cankers, Smut, Sooty_Mold, Zymoseptoria_Tritici
+
+================================================================================
+NOTES:
+================================================================================
+
+1. Exclusion lists are hardcoded from open_agentic/run_sweeps.sh and represent
+   quality-judge flagged diseases (INCORRECT + QUESTIONABLE labels).
+
+2. The test-per-class calculation is performed ONLY on the kept (non-excluded)
+   classes to ensure balanced dataset allocation for evaluation.
+
+3. The minimum of 5 samples per class ensures sufficient test coverage even
+   for crops with many disease classes (Corn, Wheat, Soybean).
+
+4. For crops with fewer kept classes (Coffee, Orange), the formula allows
+   up to 25 samples per class (50 // 2 = 25).
+
+5. Total test samples across all crops = 100 + 45 + 49 + 48 + 50 + 50 + 165 = 557
+
+================================================================================
+Generated: 2026-05-03
+Script: prepare_dataset_with_requirement.sh
+================================================================================

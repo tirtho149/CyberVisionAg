@@ -78,9 +78,10 @@ def _fmt_delta(acc, baseline, bold=False):
 def table_main_results():
     """Compact table: agent methods across k, delta from Agent(no KB, k=0) baseline."""
     crops = [
-        ("Soybean_Diseases", "Soybean (25)", ["none", "internet"]),
         ("Corn_Diseases", "Corn (30)", ["none", "internet"]),
+        ("Banana_Diseases", "Banana (6)", ["none", "internet"]),
         ("Mango_Leaf_Disease", "Mango (4)", ["none", "internet"]),
+        ("Orange_Diseases", "Orange (1)", ["none", "internet"]),
     ]
     ks = [0, 1, 4, 8, 16]
     method_labels = {
@@ -181,9 +182,10 @@ def table_main_results():
 def table_model_ablation():
     """Model ablation: haiku/sonnet/opus at internet KB, k=8."""
     crops = [
-        ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
+        ("Banana_Diseases", "Banana"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Orange_Diseases", "Orange"),
     ]
     models = [("haiku", "Haiku"), ("sonnet", "Sonnet"), ("opus", "Opus")]
 
@@ -191,7 +193,9 @@ def table_model_ablation():
     best_per_crop = {}
     for crop_id, _ in crops:
         vals = [_load(crop_id, "internet", m, 8) for m, _ in models]
-        best_per_crop[crop_id] = max(v for v in vals if v is not None)
+        valid_vals = [v for v in vals if v is not None]
+        if valid_vals:
+            best_per_crop[crop_id] = max(valid_vals)
 
     lines = []
     lines.append(r"\begin{table}[t]")
@@ -224,9 +228,10 @@ def table_model_ablation():
 def table_appendix_delta():
     """Appendix table showing improvement over Agent(no KB, k=0) baseline for every config."""
     crops = [
-        ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
+        ("Banana_Diseases", "Banana"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Orange_Diseases", "Orange"),
     ]
     ks = [0, 1, 4, 8, 16]
 
@@ -292,9 +297,10 @@ def table_appendix_delta():
 def table_fewshot_comparison():
     """Appendix table: few-shot accuracy with delta from baseline (Agent no KB, k=0)."""
     crops = [
-        ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
+        ("Banana_Diseases", "Banana"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Orange_Diseases", "Orange"),
     ]
     ks = [0, 1, 4, 8, 16]
 
@@ -352,9 +358,10 @@ def table_fewshot_comparison():
 def table_attractor_guide():
     """Table comparing Opus baseline vs Opus + attractor guide at k=8."""
     crops = [
-        ("Soybean_Diseases", "Soybean (27)"),
-        ("Corn_Diseases", "Corn (31)"),
-        ("Mango_Leaf_Disease", "Mango (7)"),
+        ("Corn_Diseases", "Corn (30)"),
+        ("Banana_Diseases", "Banana (6)"),
+        ("Mango_Leaf_Disease", "Mango (4)"),
+        ("Orange_Diseases", "Orange (1)"),
     ]
 
     lines = []
@@ -404,11 +411,12 @@ def table_attractor_guide():
 # ── Table: Cost analysis ─────────────────────────────────────────────────────
 
 def table_cost_analysis():
-    """Cost per image across k values for Sonnet + internet KB, all 3 crops."""
+    """Cost per image across k values for Sonnet + internet KB, all crops."""
     crops = [
-        ("Soybean_Diseases", "Soybean"),
         ("Corn_Diseases", "Corn"),
+        ("Banana_Diseases", "Banana"),
         ("Mango_Leaf_Disease", "Mango"),
+        ("Orange_Diseases", "Orange"),
     ]
     ks = [0, 1, 4, 8, 16]
 
@@ -445,6 +453,61 @@ def table_cost_analysis():
     return "\n".join(lines)
 
 
+# ── Table: Gemini comparison ────────────────────────────────────────────────────
+
+def table_gemini_comparison():
+    """Gemini (flash/pro) vs Sonnet comparison across crops with Gemini data."""
+    crops_data = [
+        ("Mango_Leaf_Disease", "Mango", "internet", [0, 1, 4, 8, 16]),
+        ("Soybean_Diseases", "Soybean", "none", [0, 1, 4]),
+    ]
+    models = [
+        ("sonnet", "Sonnet"),
+        ("gemini-flash", "Gemini Flash"),
+        ("gemini-pro", "Gemini Pro"),
+    ]
+
+    lines = []
+    lines.append(r"\begin{table*}[t]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(r"\caption{Gemini model comparison: accuracy (\%) across crops and reference budgets $k$ (Mango with internet KB, Soybean without KB). Best per crop--$k$ in \textbf{bold}.}")
+    lines.append(r"\label{tab:gemini_comparison}")
+
+    for crop_id, crop_label, source, ks in crops_data:
+        baseline = _load(crop_id, "none", "sonnet", 0)
+
+        lines.append(r"\vspace{4pt}")
+        lines.append(f"\\textbf{{{crop_label}}} (baseline Sonnet: {_fmt(baseline)})\\\\[2pt]")
+        lines.append(r"\begin{tabular}{l" + "r" * len(ks) + "}")
+        lines.append(r"\toprule")
+        lines.append(r"Model & " + " & ".join(f"$k={k}$" for k in ks) + r" \\")
+        lines.append(r"\midrule")
+
+        # Find best per k
+        best_per_k = {}
+        for k in ks:
+            vals = [_load(crop_id, source, m, k) for m, _ in models]
+            valid_vals = [v for v in vals if v is not None]
+            best_per_k[k] = max(valid_vals) if valid_vals else -1
+
+        for model_id, model_label in models:
+            cells = []
+            for k in ks:
+                acc = _load(crop_id, source, model_id, k)
+                is_best = acc is not None and abs(acc - best_per_k[k]) < 0.01
+                cells.append(_fmt_with_delta(acc, baseline, bold=is_best))
+            lines.append(f"{model_label} & " + " & ".join(cells) + r" \\")
+
+        lines.append(r"\bottomrule")
+        lines.append(r"\end{tabular}")
+        lines.append("")
+
+    lines.append(r"\end{table*}")
+
+    return "\n".join(lines)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -472,6 +535,11 @@ def main():
     out = TABLES_OUT / "table_cost.tex"
     out.write_text(tex)
     print(f"  Cost analysis → {out.name}")
+
+    tex = table_gemini_comparison()
+    out = TABLES_OUT / "table_gemini_comparison.tex"
+    out.write_text(tex)
+    print(f"  Gemini comparison → {out.name}")
 
 
 if __name__ == "__main__":

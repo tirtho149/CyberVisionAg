@@ -37,7 +37,7 @@ RESULTS_DIR = CYBERVISION_DIR / "results" / "open_agentic"
 # ── Config ─────────────────────────────────────────────────────────────────────
 MODEL = "sonnet"
 _ACTIVE_MODEL = MODEL  # set by main() from CLI args
-TIMEOUT_S = 300  # 5 minutes per image
+TIMEOUT_S = 600  # 10 minutes per image
 ENV_STRIP_PREFIXES = ("CLAUDE", "CURSOR", "MCP_CONNECTION", "VSCODE", "ELECTRON")
 
 def _resolve_backend(model: str) -> tuple[str, str]:

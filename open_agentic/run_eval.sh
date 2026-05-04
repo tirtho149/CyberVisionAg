@@ -6,8 +6,11 @@ set -euo pipefail
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate vl-reasoning
 set -a && source .env && set +a
 
+# Install required dependencies
+python3 -m pip install --quiet Pillow opencv-python numpy pandas 2>/dev/null || true
+
 for src in none local internet; do
-  PYTHONUNBUFFERED=1 python -m CyberVisionAg.open_agentic.eval \
+  PYTHONUNBUFFERED=1 python3 -m CyberVisionAg.open_agentic.eval \
     --symptom-source $src --num-classes 10 --images-per-class 3 \
     --k 4 --parallel 12 --seed 42 \
     > /tmp/open_agentic_${src}.log 2>&1 &

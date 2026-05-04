@@ -30,9 +30,6 @@ get_diseases() {
         sugarcane)
             echo "Brown_Spot Pokkah_Boeng Sett_Rot Sugarcane_Mosaic_Virus Common_Rust Dried_Leaves Leaf_Scald Streak_Mosaic_Scsmv Yellow_Spot Banded_Chlorosis Eye_Spot Grassy_Shoot Red_Spot Yellow_Leaf"
             ;;
-        tomato)
-            echo "Tomato_Spotted_Wilt_Virus Southern_Blight Powdery_Mildew Bacterial_Speck_Of_Tomato Cucumber_Mosaic_Virus Verticillium_Wilt Leaf_Mold Septoria_Leaf_Blotch"
-            ;;
         wheat)
             echo "Bacterial_Leaf_Streak_Black_Chaff Stem_Rust Loose_Smut Septoria_Leaf_Blotch Powdery_Mildew Resistance_Phenotype__Moderately_Resistant Resistance_Phenotype__Moderately_Susceptible Resistance_Phenotype__Resistant Resistance_Phenotype__Susceptible Stripe_Rust"
             ;;
@@ -43,7 +40,7 @@ get_diseases() {
 }
 
 # Available crops (lowercase for open_agentic/run_sweeps.sh)
-crops="banana cauliflower coffee orange sugarcane tomato wheat"
+crops="banana cauliflower coffee orange sugarcane wheat"
 
 # Default family (can be overridden with argument)
 FAMILY="${1:-claude}"
@@ -77,7 +74,7 @@ for crop in $crops; do
     done
 done
 echo ""
-echo "Total: 7 crops, $total_classes disease classes"
+echo "Total: 6 crops, $total_classes disease classes"
 echo ""
 
 read -p "Continue? (y/N) " confirm
@@ -87,16 +84,16 @@ if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
 fi
 
 echo ""
-echo "⚡ Fast mode: Running parallel evaluation sweeps (1 image/class)"
-echo "Expected duration: ~10-15 minutes"
+echo "Running parallel evaluation sweeps (5 images/class, no few-shot)"
 echo ""
-echo "Starting evaluation sweeps for 7 crop(s) in parallel..."
+echo "Starting evaluation sweeps for 6 crop(s) in parallel..."
 echo "Timestamp: $(date)"
 echo ""
 
-# Modify open_agentic/run_sweeps.sh to use 1 image per class for speed
-echo "Configuring for fast evaluation (IMAGES=1)..."
-sed -i.bak 's/^IMAGES=5/IMAGES=1/' open_agentic/run_sweeps.sh
+# Force IMAGES=5 globally (override default IMAGES=1 and per-crop IMAGES=10)
+# and disable few-shot baseline.
+echo "Configuring evaluation (IMAGES=5, no few-shot)..."
+sed -i.bak -e 's/^IMAGES=1 /IMAGES=5 /' -e 's/^            IMAGES=10 /            IMAGES=5  /' -e 's/^    FEWSHOT_K_VALUES=(0 1 4 8 16)$/    FEWSHOT_K_VALUES=()/' open_agentic/run_sweeps.sh
 
 total=0
 completed=0
@@ -126,7 +123,7 @@ for crop in $crops; do
 done
 
 echo ""
-echo "All 7 crops started. Waiting for completion..."
+echo "All 6 crops started. Waiting for completion..."
 echo "Individual logs: /tmp/{crop_name}_sweep.log"
 echo ""
 
