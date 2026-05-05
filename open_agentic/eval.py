@@ -55,8 +55,19 @@ def _resolve_backend(model: str) -> tuple[str, str]:
 
 # ── KB loading ─────────────────────────────────────────────────────────────────
 
-def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -> str | None:
-    """Load KB text from the specified source."""
+def load_kb(
+    symptom_source: str,
+    dataset_name: str,
+    all_columns: bool = False,
+    classes: list[str] | None = None,
+) -> str | None:
+    """Load KB text from the specified source.
+
+    If `classes` is provided, only KB rows whose disease name is in that set
+    are included in the returned markdown. This prevents excluded classes
+    (i.e., classes filtered out of the eval candidate list) from leaking
+    into the prompt sent to the agent. Pass the post-exclude class list.
+    """
     if symptom_source == "none":
         return None
 
@@ -64,6 +75,7 @@ def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -
         if not SYMPTOMS_FILE.exists():
             print(f"  WARNING: {SYMPTOMS_FILE} not found, proceeding without KB")
             return None
+        # Default markdown KB is unstructured prose; class filtering not applied.
         return _extract_crop_section(SYMPTOMS_FILE, dataset_name)
 
     # local or internet → read from per-crop folder
@@ -72,7 +84,9 @@ def load_kb(symptom_source: str, dataset_name: str, all_columns: bool = False) -
     if not xlsx_path.exists():
         print(f"  WARNING: {xlsx_path} not found, proceeding without KB")
         return None
-    return _load_xlsx_as_markdown(xlsx_path, all_columns=all_columns)
+    return _load_xlsx_as_markdown(
+        xlsx_path, all_columns=all_columns, classes=classes
+    )
 
 
 def _extract_crop_section(kb_file: Path, dataset_name: str) -> str:
@@ -116,21 +130,31 @@ def kb_coverage(symptom_source: str, dataset_name: str, classes: list[str]) -> d
     return {cls: True for cls in classes}  # assume coverage for unknown sources
 
 
-def _load_xlsx_as_markdown(xlsx_path: Path, all_columns: bool = False) -> str:
+def _load_xlsx_as_markdown(
+    xlsx_path: Path,
+    all_columns: bool = False,
+    classes: list[str] | None = None,
+) -> str:
     """Convert xlsx to markdown.
 
     Args:
         xlsx_path: Path to the xlsx file.
         all_columns: If True, include Pathogen, Type, Affected Parts in addition
             to Visual Description. If False, only Visual Description (legacy).
+        classes: If provided, only emit rows whose disease name is in this
+            set. Used to keep excluded classes out of the prompt even when
+            their KB rows exist in the workbook.
     """
     import openpyxl
     wb = openpyxl.load_workbook(xlsx_path, read_only=True)
     ws = wb.active
+    class_set = set(classes) if classes is not None else None
     lines = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         disease = row[0]
         if not disease:
+            continue
+        if class_set is not None and str(disease).strip() not in class_set:
             continue
         description = row[4] if len(row) > 4 else None
         if not all_columns:
@@ -999,12 +1023,18 @@ def main():
     if ref_dir:
         print(f"  Ref source: {ref_dir} ({'parts' if use_parts else 'merged'})")
 
-    # Load KB
+    # Load KB. Pass `classes` so xlsx rows for excluded classes don't leak
+    # into the prompt even if the workbook contains them.
     if args.kb_file:
         kb_text = Path(args.kb_file).read_text()
         kb_label = Path(args.kb_file).stem  # e.g., "kb_v1"
     else:
-        kb_text = load_kb(args.symptom_source, args.dataset, all_columns=args.all_kb_columns)
+        kb_text = load_kb(
+            args.symptom_source,
+            args.dataset,
+            all_columns=args.all_kb_columns,
+            classes=classes,
+        )
         kb_label = args.symptom_source
 
     # Setup logging — dir includes crop/kb/model/k so configs don't clobber
