@@ -43,7 +43,7 @@
 set -uo pipefail
 
 IMAGES=3   # test images per class (1=fast directional, 3=final paper)
-PARALLEL=20
+PARALLEL=12
 SEED=42
 COMMAND="${1:-}"
 CROP="${2:-}"
