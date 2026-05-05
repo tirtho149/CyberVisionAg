@@ -25,6 +25,8 @@ Output:
   * <output-dir>/_tags.csv         -- audit log: class, file, match, part, split, reason
 """
 
+from __future__ import annotations  # Python 3.9 compatibility (PEP 563)
+
 import argparse
 import base64
 import csv

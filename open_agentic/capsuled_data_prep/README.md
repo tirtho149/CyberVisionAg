@@ -3,6 +3,9 @@
 Self-contained capsule for running `prepare_dataset` on a remote cluster
 without checking out the rest of the AgCrawler / CyberVisionAg repos.
 
+For SSH details, cluster paths, transfer/resync commands, and monitoring
+recipes specific to ISU Nova, see [CLUSTER.md](CLUSTER.md).
+
 What it does: walks a per-crop directory of labeled images, asks Claude
 (via the Anthropic API) whether each image matches the symptom KB for
 its class, and copies matched images into part-tagged reference and
