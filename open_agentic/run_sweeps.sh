@@ -58,10 +58,9 @@ setup_crop() {
     # Crop name as it appears in disease_label_subset_report.json (Title Case).
     # Leave empty to skip quality-report filtering for this crop.
     QUALITY_CROP=""
-    # Reference budgets to sweep. Default = supplementary partial sweep
-    # (k=0, 8). Flagship crops (soybean, corn, mango) override to a full
-    # sweep (k=0, 1, 4, 8). k=16 is dropped across the board.
-    K_LIST=(0 8)
+    # Reference budgets to sweep. Same set for every crop: k=0, 1, 4, 8.
+    # k=16 is dropped across the board.
+    K_LIST=(0 1 4 8)
 
     case "${CROP}" in
         soybean)
@@ -73,7 +72,6 @@ setup_crop() {
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Soybean_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Soybean/part_index.md"
             QUALITY_CROP="Soybean"
-            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         corn)
             DATASET="Corn_Diseases"
@@ -83,7 +81,6 @@ setup_crop() {
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Corn_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Corn/part_index.md"
             QUALITY_CROP="Corn"
-            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         mango)
             DATASET="Mango_Leaf_Disease"
@@ -94,7 +91,6 @@ setup_crop() {
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango_Leaf/part_index.md"
             IMAGES=10  # override: use all 10 test images per class (only 4 classes)
             QUALITY_CROP="Mango"
-            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         tomato)
             # Dataset: Data/Tomato (from selected_10crops_100_fast.zip, extracted 2026-04-26).
@@ -231,17 +227,20 @@ RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 # Build configs dynamically based on family and the crop's KB sources.
 AGENTIC_CONFIGS=()
 if [ "${FAMILY}" = "claude" ]; then
-    # Primary sweep: sonnet × all KB × per-crop K_LIST (flagship: 0 1 4 8;
-    # supplementary: 0 8). k=16 is dropped across the board.
+    # Primary sweep: sonnet × all KB × K_LIST (k=0, 1, 4, 8 for all crops).
+    # k=16 is dropped across the board.
     for src in "${KB_SOURCES[@]}"; do
         for k in "${K_LIST[@]}"; do
             AGENTIC_CONFIGS+=("sonnet,${src},${k}")
         done
     done
-    # Model ablation: haiku + opus at internet/k=8.
+    # Model ablation: haiku at internet/k=8.
     AGENTIC_CONFIGS+=("haiku,internet,8")
-    AGENTIC_CONFIGS+=("opus,internet,8")
-    FEWSHOT_K_VALUES=("${K_LIST[@]}")
+    # TEMP DISABLED: opus model ablation (re-enable for paper-final).
+    # AGENTIC_CONFIGS+=("opus,internet,8")
+    # TEMP DISABLED: few-shot baseline (re-enable for paper-final).
+    # FEWSHOT_K_VALUES=("${K_LIST[@]}")
+    FEWSHOT_K_VALUES=()
 else
     # Gemini family: flash + pro × all KB × per-crop K_LIST. Thinking budget
     # overridden via CyberVisionAg/.gemini/settings.json (0 for Flash,
