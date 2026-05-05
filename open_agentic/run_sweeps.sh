@@ -58,6 +58,10 @@ setup_crop() {
     # Crop name as it appears in disease_label_subset_report.json (Title Case).
     # Leave empty to skip quality-report filtering for this crop.
     QUALITY_CROP=""
+    # Reference budgets to sweep. Default = supplementary partial sweep
+    # (k=0, 8). Flagship crops (soybean, corn, mango) override to a full
+    # sweep (k=0, 1, 4, 8). k=16 is dropped across the board.
+    K_LIST=(0 8)
 
     case "${CROP}" in
         soybean)
@@ -69,6 +73,7 @@ setup_crop() {
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Soybean_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Soybean/part_index.md"
             QUALITY_CROP="Soybean"
+            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         corn)
             DATASET="Corn_Diseases"
@@ -78,6 +83,7 @@ setup_crop() {
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Corn_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Corn/part_index.md"
             QUALITY_CROP="Corn"
+            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         mango)
             DATASET="Mango_Leaf_Disease"
@@ -88,6 +94,7 @@ setup_crop() {
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Mango_Leaf/part_index.md"
             IMAGES=10  # override: use all 10 test images per class (only 4 classes)
             QUALITY_CROP="Mango"
+            K_LIST=(0 1 4 8)  # flagship: full sweep
             ;;
         tomato)
             # Dataset: Data/Tomato (from selected_10crops_100_fast.zip, extracted 2026-04-26).
@@ -224,21 +231,23 @@ RESULTS_BASE="${SCRIPT_DIR}/../results/open_agentic/${DATASET}"
 # Build configs dynamically based on family and the crop's KB sources.
 AGENTIC_CONFIGS=()
 if [ "${FAMILY}" = "claude" ]; then
-    # Primary sweep: sonnet × all KB × all k.
+    # Primary sweep: sonnet × all KB × per-crop K_LIST (flagship: 0 1 4 8;
+    # supplementary: 0 8). k=16 is dropped across the board.
     for src in "${KB_SOURCES[@]}"; do
-        for k in 0 1 4 8 16; do
+        for k in "${K_LIST[@]}"; do
             AGENTIC_CONFIGS+=("sonnet,${src},${k}")
         done
     done
     # Model ablation: haiku + opus at internet/k=8.
     AGENTIC_CONFIGS+=("haiku,internet,8")
     AGENTIC_CONFIGS+=("opus,internet,8")
-    FEWSHOT_K_VALUES=(0 1 4 8 16)
+    FEWSHOT_K_VALUES=("${K_LIST[@]}")
 else
-    # Gemini family: flash + pro × all KB × all k. Thinking budget overridden
-    # via CyberVisionAg/.gemini/settings.json (0 for Flash, 128 min for Pro).
+    # Gemini family: flash + pro × all KB × per-crop K_LIST. Thinking budget
+    # overridden via CyberVisionAg/.gemini/settings.json (0 for Flash,
+    # 128 min for Pro).
     for src in "${KB_SOURCES[@]}"; do
-        for k in 0 1 4 8 16; do
+        for k in "${K_LIST[@]}"; do
             AGENTIC_CONFIGS+=("gemini-flash,${src},${k}")
             AGENTIC_CONFIGS+=("gemini-pro,${src},${k}")
         done
@@ -374,16 +383,26 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
 
     echo "=== Table 1: Method × k — ${DATASET} (${FAMILY}) ==="
     echo ""
-    printf "%-28s | %15s | %15s | %15s | %15s | %15s\n" "Method" "k=0" "k=1" "k=4" "k=8" "k=16"
-    printf "%-28s-|-%15s-|-%15s-|-%15s-|-%15s-|-%15s\n" "----------------------------" "---------------" "---------------" "---------------" "---------------" "---------------"
+    # Header: dynamic columns from K_LIST (drops k=16 globally).
+    header_fmt="%-28s"
+    sep_fmt="%-28s"
+    header_args=("Method")
+    sep_args=("----------------------------")
+    for k in "${K_LIST[@]}"; do
+        header_fmt+=" | %15s"
+        sep_fmt+="-|-%15s"
+        header_args+=("k=${k}")
+        sep_args+=("---------------")
+    done
+    printf "${header_fmt}\n" "${header_args[@]}"
+    printf "${sep_fmt}\n" "${sep_args[@]}"
     # Few-shot (claude family only; few_shot.py is anthropic-only)
     if [ "${FAMILY}" = "claude" ]; then
-        fr0=$(read_accuracy sonnet "few_shot" 0)
-        fr1=$(read_accuracy sonnet "few_shot" 1)
-        fr4=$(read_accuracy sonnet "few_shot" 4)
-        fr8=$(read_accuracy sonnet "few_shot" 8)
-        fr16=$(read_accuracy sonnet "few_shot" 16)
-        printf "%-28s | %15s | %15s | %15s | %15s | %15s\n" "Few-shot baseline" "${fr0}" "${fr1}" "${fr4}" "${fr8}" "${fr16}"
+        row_args=("Few-shot baseline")
+        for k in "${K_LIST[@]}"; do
+            row_args+=("$(read_accuracy sonnet "few_shot" "${k}")")
+        done
+        printf "${header_fmt}\n" "${row_args[@]}"
     fi
     # Agentic rows: model × KB-source
     for model in "${TABLE1_MODELS[@]}"; do
@@ -391,13 +410,11 @@ if [ "${COMMAND}" = "results" ] || [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = 
             kb_label="no KB"
             [ "${src}" = "local" ] && kb_label="local KB"
             [ "${src}" = "internet" ] && kb_label="internet KB"
-            label="Agent ${model} (${kb_label})"
-            r0=$(read_accuracy "${model}" "${src}" 0)
-            r1=$(read_accuracy "${model}" "${src}" 1)
-            r4=$(read_accuracy "${model}" "${src}" 4)
-            r8=$(read_accuracy "${model}" "${src}" 8)
-            r16=$(read_accuracy "${model}" "${src}" 16)
-            printf "%-28s | %15s | %15s | %15s | %15s | %15s\n" "${label}" "${r0}" "${r1}" "${r4}" "${r8}" "${r16}"
+            row_args=("Agent ${model} (${kb_label})")
+            for k in "${K_LIST[@]}"; do
+                row_args+=("$(read_accuracy "${model}" "${src}" "${k}")")
+            done
+            printf "${header_fmt}\n" "${row_args[@]}"
         done
     done
     echo ""
