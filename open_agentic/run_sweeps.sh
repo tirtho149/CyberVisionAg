@@ -43,7 +43,7 @@
 set -uo pipefail
 
 IMAGES=3   # test images per class (1=fast directional, 3=final paper)
-PARALLEL=12
+PARALLEL=20
 SEED=42
 COMMAND="${1:-}"
 CROP="${2:-}"
@@ -234,8 +234,8 @@ if [ "${FAMILY}" = "claude" ]; then
             AGENTIC_CONFIGS+=("sonnet,${src},${k}")
         done
     done
-    # Model ablation: haiku at internet/k=8.
-    AGENTIC_CONFIGS+=("haiku,internet,8")
+    # TEMP DISABLED: haiku model ablation (re-enable for paper-final).
+    # AGENTIC_CONFIGS+=("haiku,internet,8")
     # TEMP DISABLED: opus model ablation (re-enable for paper-final).
     # AGENTIC_CONFIGS+=("opus,internet,8")
     # TEMP DISABLED: few-shot baseline (re-enable for paper-final).
