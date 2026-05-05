@@ -1,0 +1,31 @@
+[
+  {
+    "type": "tool_use",
+    "tool": "ToolSearch",
+    "input": {
+      "query": "select:Read"
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/tmp/classify_j4xk7ebn.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "The test image shows a tomato plant in the center that has completely collapsed/wilted \u2014 leaves are drooping, the whole plant has fallen, while surrounding plants are healthy. This is a whole-plant wilt symptom. The leaves appear still greenish (not yellowed), suggesting rapid sudden wilt rather than slow vascular disease.\n\nKey candidates: Southern_Bacterial_Wilt, Bacterial_Wilt, Bacterial_Canker_And_Wilt_Of_Tomato, Southern_Blight.\n\nNo white fungal mats visible at the base (rules out Southern_Blight), no mosaic pattern (rules out CMV). The sudden complete collapse with green leaves is classic for bacterial wilt. I'll use my 1 reference image to confirm Southern_Bacterial_Wilt."
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Bacterial_Wilt/whole_plant/Bugwood_15.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "The reference image is an extremely strong visual match to the test image:\n- Both show complete whole-plant wilt/collapse on black plastic mulch\n- Both show drooping green leaves with total plant collapse\n- Same commercial tomato field setting\n- Even the Bugwood image numbers are consecutive (5593858 test vs 5593860 reference), suggesting same photo series\n\nThe symptom description for Southern_Bacterial_Wilt (Ralstonia solanacearum) \u2014 sudden plant collapse, permanent wilt, vascular discoloration \u2014 perfectly fits this presentation.\n\n```json\n{\"prediction\": \"Southern_Bacterial_Wilt\", \"confidence\": 0.93, \"reasoning\": \"The test image shows complete sudden whole-plant wilt/collapse of a single tomato plant growing on black plastic mulch, with surrounding healthy plants. Leaves remain green (not yellowed), consistent with rapid vascular occlusion by Ralstonia solanacearum. The reference image for Southern_Bacterial_Wilt is visually nearly identical \u2014 same black mulch, same complete plant collapse, same drooping green foliage, same commercial field setting. No white fungal mats at base (excludes Southern_Blight), no mosaic (excludes CMV), no localized leaf lesions (excludes Bacterial_Canker).\"}\n```"
+  }
+]

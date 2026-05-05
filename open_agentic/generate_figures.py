@@ -23,14 +23,23 @@ FIGURES_DIR = Path(__file__).resolve().parents[2] / "writing" / "69aae430e8bdcbd
 # ── Data loading ──────────────────────────────────────────────────────────────
 
 def load_crop_data():
-    """Load crop/disease/image data from all-crops-v2.csv."""
+    """Load crop/disease/image data from all-crops-v2.csv.
+
+    Stops at the trailing summary block (empty row or "--- SUMMARY ---"
+    marker), so summary metric rows like "Crops, 335" don't leak in.
+    """
     import csv
     crops = defaultdict(list)
     with open(CSV_PATH) as f:
         for row in csv.DictReader(f):
-            crop = row["crop"]
-            disease = row["disease"]
-            images = int(row["images"])
+            crop = row.get("crop", "").strip()
+            if not crop or crop.startswith("---"):
+                break
+            try:
+                images = int(row.get("images", "").strip())
+            except ValueError:
+                continue
+            disease = row.get("disease", "").strip()
             crops[crop].append((disease, images))
     return dict(crops)
 
@@ -178,7 +187,7 @@ def figure_3_sunburst():
         ],
         annotations=[
             dict(
-                text=f"<b>{total_images / 1_000_000:.1f}M</b><br>Images<br><span style='font-size:9px;color:#7f8c8d'>{len(data)} crops · {total_diseases} diseases</span>",
+                text=f"<b>{total_images / 1_000:.0f}K</b><br>Images<br><span style='font-size:9px;color:#7f8c8d'>{len(data)} crops · {total_diseases} diseases</span>",
                 x=0.5, y=0.5, showarrow=False,
                 font=dict(size=16, family="Arial", color="#2c3e50"),
                 xref="paper", yref="paper",
@@ -458,6 +467,228 @@ def figure_5_cost_accuracy():
     print(f"  Saved: {out}")
 
 
+# ── Figure 6: KB sources (registry composition) ───────────────────────────────
+
+REGISTRY_OUTPUTS_DIR = SCRIPT_DIR.parent / "disease_registry" / "outputs"
+
+_KB_CAT_LABEL = {
+    "university_extension": "University extension",
+    "compendia_handbook":   "Compendia / handbooks (CABI, Lucid, PNW)",
+    "peer_reviewed":        "Peer-reviewed journals",
+    "multi_uni_network":    "Crop Protection Network",
+    "society_journal":      "APS journals",
+    "industry":             "Industry agronomy",
+    "government":           ".gov / USDA",
+    "grower_guide":         "Grower guides",
+    "other_web":            "Other",
+}
+_KB_CAT_COLOR = {
+    "university_extension": "#3498db",
+    "compendia_handbook":   "#2ecc71",
+    "peer_reviewed":        "#8e44ad",
+    "multi_uni_network":    "#e67e22",
+    "society_journal":      "#16a085",
+    "industry":             "#f39c12",
+    "government":           "#34495e",
+    "grower_guide":         "#95a5a6",
+    "other_web":            "#bdc3c7",
+}
+_KB_CAT_ORDER = list(_KB_CAT_LABEL.keys())
+
+_KB_TOP_FIELDS = ("pathogen_scientific_name", "type_of_disease", "affected_parts")
+_KB_SYM_SUBFIELDS = ("summary", "diagnostic_features", "look_alikes")
+
+_DOMAIN_NICE = {
+    "content.ces.ncsu.edu":      "ces.ncsu.edu  (NC State Extension)",
+    "extension.umn.edu":         "extension.umn.edu  (Minnesota)",
+    "pmc.ncbi.nlm.nih.gov":      "PubMed Central",
+    "cropprotectionnetwork.org": "Crop Protection Network",
+    "frontiersin.org":           "Frontiers (peer-reviewed)",
+    "apps.lucidcentral.org":     "Lucid Pacific Pests",
+    "pnwhandbooks.org":          "PNW Plant Disease Handbook",
+    "ag.umass.edu":              "ag.umass.edu  (UMass Extension)",
+    "apsjournals.apsnet.org":    "APS Journals",
+    "hort.extension.wisc.edu":   "extension.wisc.edu  (Wisconsin)",
+    "cropwatch.unl.edu":         "cropwatch.unl.edu  (Nebraska)",
+    "cabi.org":                  "CABI Compendium",
+    "edis.ifas.ufl.edu":         "edis.ifas.ufl.edu  (Florida)",
+    "extension.oregonstate.edu": "extension.oregonstate.edu",
+    "vegetables.cornell.edu":    "vegetables.cornell.edu",
+    "ipm.ucanr.edu":             "ipm.ucanr.edu  (UC ANR)",
+    "cropscience.bayer.us":      "cropscience.bayer.us",
+    "ohioline.osu.edu":          "ohioline.osu.edu  (Ohio State)",
+    "crops.extension.iastate.edu": "crops.extension.iastate.edu  (Iowa State)",
+}
+
+
+def _kb_domain(url: str) -> str:
+    from urllib.parse import urlparse
+    if not url:
+        return ""
+    try:
+        return urlparse(url).netloc.lower().replace("www.", "")
+    except Exception:
+        return ""
+
+
+def _kb_categorize(d: str) -> str:
+    if not d:
+        return "none"
+    if any(s in d for s in ("pmc.ncbi", "ncbi.nlm", "sciencedirect", "springer",
+                            "wiley", "mdpi", "frontiersin", "nature.com", "plos",
+                            "tandfonline", "academic.oup", "scialert")):
+        return "peer_reviewed"
+    if "apsnet" in d or "apsjournals" in d:
+        return "society_journal"
+    if any(s in d for s in ("cabi", "plantwise", "lucidcentral", "pnwhandbooks")):
+        return "compendia_handbook"
+    if "cropprotectionnetwork" in d:
+        return "multi_uni_network"
+    if (d.endswith(".edu") or d.endswith(".ac.uk") or "extension" in d
+            or "ifas" in d or "ces.ncsu" in d or "cropwatch" in d
+            or "ohioline" in d or "ndsu" in d or "pddc.wisc" in d
+            or "ipm.ucanr" in d or "purdue" in d or "uky" in d
+            or "smallgrains.wsu" in d or "tnau.ac.in" in d):
+        return "university_extension"
+    if d.endswith(".gov") or "usda" in d or "aphis" in d:
+        return "government"
+    if any(s in d for s in ("bayer", "syngenta", "corteva", "basf", "fmc")):
+        return "industry"
+    if "wikipedia" in d:
+        return "wikipedia"
+    if any(s in d for s in ("plantix", "gardeningknowhow", "planetnatural",
+                            "greenlife", "rhs.org", "eagri", "agritech")):
+        return "grower_guide"
+    return "other_web"
+
+
+def _kb_collect_citations():
+    """Walk every crop's final_registry.json and yield (crop, domain, category)."""
+    from collections import defaultdict
+    cit_per_crop_cat = defaultdict(lambda: defaultdict(int))
+    domain_total = defaultdict(int)
+    domain_category = {}
+    for cdir in sorted(REGISTRY_OUTPUTS_DIR.iterdir()):
+        if not cdir.is_dir():
+            continue
+        reg_path = cdir / "final_registry.json"
+        if not reg_path.exists():
+            continue
+        crop = cdir.name
+        reg = json.loads(reg_path.read_text())
+        for d in reg.get("diseases", []):
+            urls = []
+            for f in _KB_TOP_FIELDS:
+                v = d.get(f, {}) or {}
+                if v.get("value") and v.get("url"):
+                    urls.append(v["url"])
+            vs = d.get("visual_symptoms", {}) or {}
+            for sf in _KB_SYM_SUBFIELDS:
+                sub = vs.get(sf, {}) or {}
+                if sub.get("value") and sub.get("url"):
+                    urls.append(sub["url"])
+            for c in d.get("conflicts", []) or []:
+                if c.get("alternative_source_url"):
+                    urls.append(c["alternative_source_url"])
+            for u in urls:
+                dom = _kb_domain(u)
+                if not dom:
+                    continue
+                cat = _kb_categorize(dom)
+                cit_per_crop_cat[crop][cat] += 1
+                domain_total[dom] += 1
+                domain_category[dom] = cat
+    return cit_per_crop_cat, domain_total, domain_category
+
+
+def figure_6_kb_sources():
+    """Two-panel figure: per-crop source mix + top cited domains."""
+    import matplotlib.pyplot as plt
+
+    plt.rcParams.update({
+        "font.family": "Arial",
+        "font.size": 11,
+        "axes.labelsize": 12,
+        "axes.titlesize": 13,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "legend.fontsize": 9,
+    })
+
+    cit, dom_total, dom_cat = _kb_collect_citations()
+    crops = list(cit.keys())
+    totals = {c: sum(cit[c].values()) for c in crops}
+    crops_sorted = sorted(crops, key=lambda c: totals[c], reverse=True)
+
+    top = sorted(dom_total.items(), key=lambda x: -x[1])[:15]
+    top_domains = [d for d, _ in top]
+
+    fig, (axL, axR) = plt.subplots(
+        1, 2, figsize=(13.5, 5.0),
+        gridspec_kw={"width_ratios": [1.0, 1.0]},
+    )
+
+    # Left
+    y = np.arange(len(crops_sorted))
+    left = np.zeros(len(crops_sorted))
+    for cat in _KB_CAT_ORDER:
+        vals = np.array([cit[c].get(cat, 0) for c in crops_sorted])
+        if vals.sum() == 0:
+            continue
+        axL.barh(y, vals, left=left, color=_KB_CAT_COLOR[cat],
+                 edgecolor="white", linewidth=0.5, label=_KB_CAT_LABEL[cat])
+        left += vals
+    axL.set_yticks(y)
+    axL.set_yticklabels([c.replace("_", " ") for c in crops_sorted])
+    axL.invert_yaxis()
+    axL.set_xlabel("Field-level citations")
+    axL.set_title("Where each crop's symptom knowledge comes from",
+                  loc="left", fontweight="bold", pad=8)
+    axL.spines["top"].set_visible(False)
+    axL.spines["right"].set_visible(False)
+    axL.tick_params(axis="y", length=0)
+    axL.grid(axis="x", linestyle="--", alpha=0.35, zorder=0)
+    axL.set_axisbelow(True)
+    for yi, c in zip(y, crops_sorted):
+        axL.text(totals[c] + max(totals.values()) * 0.012, yi,
+                 f"{totals[c]}", va="center", ha="left",
+                 fontsize=9, color="#555")
+
+    # Right
+    domains = top_domains[::-1]
+    yR = np.arange(len(domains))
+    counts = [dom_total[d] for d in domains]
+    colors = [_KB_CAT_COLOR.get(dom_cat[d], "#bdc3c7") for d in domains]
+    labels = [_DOMAIN_NICE.get(d, d) for d in domains]
+
+    axR.barh(yR, counts, color=colors, edgecolor="white", linewidth=0.5)
+    axR.set_yticks(yR)
+    axR.set_yticklabels(labels)
+    axR.set_xlabel("Field-level citations (all crops)")
+    axR.set_title("Top 15 sources cited in the registry",
+                  loc="left", fontweight="bold", pad=8)
+    axR.spines["top"].set_visible(False)
+    axR.spines["right"].set_visible(False)
+    axR.tick_params(axis="y", length=0)
+    axR.grid(axis="x", linestyle="--", alpha=0.35, zorder=0)
+    axR.set_axisbelow(True)
+    for yi, ct in zip(yR, counts):
+        axR.text(ct + max(counts) * 0.012, yi, f"{ct}",
+                 va="center", ha="left", fontsize=9, color="#555")
+
+    handles, labs = axL.get_legend_handles_labels()
+    fig.legend(handles, labs, loc="lower center",
+               bbox_to_anchor=(0.5, -0.02), ncol=5,
+               frameon=False, fontsize=9)
+
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.18)
+    out = FIGURES_DIR / "fig6_kb_sources.pdf"
+    plt.savefig(out, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"  Saved: {out}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -469,4 +700,6 @@ if __name__ == "__main__":
     figure_4_accuracy_vs_k()
     print("\nFigure 5: Model scaling + KB comparison")
     figure_5_cost_accuracy()
+    print("\nFigure 6: KB sources")
+    figure_6_kb_sources()
     print("\nDone.")
