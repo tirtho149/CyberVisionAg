@@ -3,30 +3,29 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read",
-      "max_results": 1
+      "query": "select:Read"
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_sxm03ft2.jpg"
+      "file_path": "/tmp/classify_mgminyik.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a green tomato leaf with multiple small, dark (black to dark brown), irregular/angular spots scattered across the surface. There is also some white/grayish scattered material on the leaf. This is a leaf lesion pattern.\n\nKey features:\n- Small, dark black irregular/angular spots\n- On leaf surface\n- Some spots appear slightly angular (following vein pattern)\n- White powdery/dusty material scattered on leaf\n\nTop candidates based on symptom descriptions:\n- **Bacterial_Speck_Of_Tomato**: small angular black spots, yellow halos on leaves\n- **Septoria_Leaf_Blotch**: small circular tan/gray lesions with dark border\n- **Tomato_Spotted_Wilt_Virus**: bronzing, necrotic spots\n\nThe dark, angular, small black spots strongly suggest Bacterial Speck. Let me view one reference image to confirm."
+    "content": "The test image shows a green leaf with multiple dark gray/black irregular lesions scattered across the surface, along with some white granular/powdery material on the leaf. The spots are irregular in shape and appear necrotic.\n\nKey features:\n- Dark gray/black irregular spots on leaf\n- White powdery/granular material on leaf surface\n- No obvious yellow halos around spots\n- Leaf remains green background\n\nTop candidates: Powdery_Mildew (white powdery coating + dark necrotic spots), Bacterial_Speck (small black spots), Septoria_Leaf_Blotch (tan/gray spots).\n\nThe combination of dark necrotic spots with white powdery material is most suggestive of Powdery_Mildew. Let me view one reference image."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Speck_Of_Tomato/leaf/Bugwood_7.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Powdery_Mildew/leaf/CDDM_116.jpg"
     }
   },
   {
     "type": "text",
-    "content": "Comparing the test image with the Bacterial_Speck reference:\n\n**Test image**: Small dark/black irregular-angular spots scattered on a broad green leaf with white scattered material. No obvious yellow halos visible.\n\n**Reference (Bacterial_Speck)**: Small dark spots with clear yellow halos and yellowing areas around spots.\n\nThe spots in the test image are darker and more irregular than classic bacterial speck, and the reference shows more pronounced yellow halos. However, the overall pattern of scattered small dark lesions on a green leaf still aligns best with Bacterial_Speck_Of_Tomato among the available classes. The angular, irregular shape of spots (some following vein lines) matches the \"angular\" descriptor for bacterial speck.\n\n```json\n{\"prediction\": \"Bacterial_Speck_Of_Tomato\", \"confidence\": 0.52, \"reasoning\": \"The test image shows small, dark/black, irregular and somewhat angular spots scattered across a green tomato leaf, which matches the description of Bacterial_Speck_Of_Tomato (small angular black spots on leaves). The reference image confirms a similar pattern of scattered dark lesions, though the test image lacks obvious yellow halos and shows some white scattered material on the leaf surface. The angular nature of the spots and their small size and dark color are the most distinguishing features pointing to bacterial speck over other candidates like Septoria (which has tan/gray spots) or TSWV (which shows bronzing and blurred margins).\"}\n```"
+    "content": "The reference image for Powdery_Mildew shows white circular powdery patches on tomato leaves (early stage). The test image differs - it shows predominantly dark gray/black irregular spots with some scattered white granular material.\n\nComparing evidence:\n- Test image: dark irregular necrotic spots + scattered white granular material on leaf\n- Powdery mildew (early): white powdery circular patches\n- The dark spots with white material could be advanced powdery mildew where lesions have become necrotic while white spore masses remain\n- The symptom description states: \"white powdery sporulation in round spots that begin small but expand and converge...lesions that become necrotic\"\n- The scattered white granular/powdery material across the leaf surface is consistent with powdery mildew sporulation\n- No yellow halos visible (rules against Bacterial_Speck), no concentric rings (rules against Early_Blight), no tan/gray centers (less likely Septoria)\n\nThe combination of dark necrotic spots (advanced infection) with scattered white powdery granules on an otherwise green leaf best fits advanced-stage Powdery_Mildew.\n\n```json\n{\"prediction\": \"Powdery_Mildew\", \"confidence\": 0.42, \"reasoning\": \"Leaf shows multiple dark gray/black irregular necrotic lesions with scattered white granular/powdery material across the leaf surface. This matches advanced-stage powdery mildew where initial white powdery sporulation has progressed to necrotic lesions while white spore masses remain visible. No yellow halos (rules out Bacterial_Speck), no concentric rings (rules out Early_Blight), lesions too dark for Septoria (tan/gray).\"}\n```"
   }
 ]

@@ -3,19 +3,20 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_jegt5p42.jpg"
+      "file_path": "/tmp/classify_997290pp.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows tomato plant cuttings with severe leaf distortion, curling, mottling, and possible bronzing/silvering. The leaves appear severely puckered and distorted \u2014 classic viral symptom pattern. Top candidates: **Cucumber_Mosaic_Virus** and **Tomato_Spotted_Wilt_Virus**.\n\nLet me check reference images for these two, plus two others."
+    "content": "The test image shows tomato stems with severely distorted, curled, and crinkled leaves with mosaic-like mottling (light/dark green patches). No lesions, no spots, no mold. This pattern strongly suggests a viral disease causing leaf distortion.\n\nTop candidates: Cucumber_Mosaic_Virus (leaf distortion + mosaic), Tomato_Spotted_Wilt_Virus, Bacterial_Canker_And_Wilt_Of_Tomato.\n\nNow viewing one reference per class across 4 different classes:"
   },
   {
     "type": "tool_use",
@@ -26,35 +27,39 @@
   },
   {
     "type": "text",
-    "content": "Strong match with CMV \u2014 distorted, curled, mottled leaves. Now checking TSWV."
+    "content": "CMV reference matches well - distorted, crinkled leaves with mosaic mottling. Now checking Tomato_Spotted_Wilt_Virus and two more classes:"
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/merged/Bugwood_10.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/merged/Bugwood_3.jpg"
     }
   },
   {
     "type": "text",
-    "content": "TSWV shows necrotic ringspots on flat leaves \u2014 doesn't match the test image. Now checking two more required classes."
+    "content": "TSWV shows wilting/necrosis, not the mosaic distortion of the test image. Now checking Bacterial_Canker and one more:"
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Wilt/merged/Bugwood_3.jpg"
-    }
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/merged/Bugwood_10.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Canker_And_Wilt_Of_Tomato/merged/Bugwood_1.jpg"
     }
   },
   {
     "type": "text",
-    "content": "**Analysis:**\n\n- **Test image**: Tomato cuttings with severe leaf curling, distortion, puckering, mottling, and stunted/crinkled leaflets \u2014 classic viral mosaic/distortion pattern.\n- **CMV reference**: Nearly identical \u2014 same severe leaf distortion, crinkled/puckered texture, mottling, no necrotic lesions.\n- **TSWV reference**: Shows necrotic ringspots on flat leaves \u2014 doesn't match the test image.\n- **Bacterial Wilt reference**: Bacterial streaming test \u2014 completely different.\n- **Verticillium Wilt reference**: Marginal yellowing/necrosis \u2014 doesn't match.\n\nThe severe leaf distortion, curling, and mottling without distinct necrotic spots strongly points to **Cucumber Mosaic Virus**.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.87, \"reasoning\": \"Test image shows tomato plant with severe leaf distortion, curling, puckering, and mottling \u2014 hallmark symptoms of CMV in tomato. The CMV reference image (Bugwood_1) shows near-identical crinkled, distorted leaves. TSWV was ruled out (shows necrotic ringspots on flat leaves), and wilt diseases don't produce this type of foliar distortion.\"}\n```"
+    "content": "Bacterial canker shows marginal necrosis/scorch - not matching. One more required view (4th class):"
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/merged/Bugwood_4.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "Verticillium Wilt shows yellowing/wilting necrosis - not matching at all.\n\n**Summary:**\n- Test image: severe leaf distortion, crinkling, curling, mosaic mottling (light/dark green), no necrosis or lesions\n- CMV reference: near-identical - same crinkled, distorted leaves with mosaic pattern\n- TSWV: dark necrosis/wilting - no match\n- Bacterial Canker: marginal scorch/necrosis - no match\n- Verticillium Wilt: yellowing/necrotic wilting - no match\n\nThe test image is a textbook CMV presentation on tomato.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.91, \"reasoning\": \"Test image shows severely distorted, crinkled, and curled tomato leaves with mosaic mottling (alternating light/dark green), no lesions or necrosis. This matches the CMV reference image almost exactly. TSWV, Bacterial Canker, and Verticillium Wilt all show necrosis/wilting patterns absent here.\"}\n```"
   }
 ]

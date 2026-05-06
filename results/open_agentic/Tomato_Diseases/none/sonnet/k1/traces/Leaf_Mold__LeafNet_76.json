@@ -1,0 +1,32 @@
+[
+  {
+    "type": "tool_use",
+    "tool": "ToolSearch",
+    "input": {
+      "query": "select:Read",
+      "max_results": 1
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/tmp/classify__ezizkvh.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "The test image shows a tomato compound leaf with:\n- Widespread interveinal chlorosis (pale green/yellow leaves, veins slightly greener)\n- Brown necrotic areas, especially at leaf margins and tips\n- One severely affected leaflet (left) with large brown necrotic/curled tissue\n- Scattered small brown spots on leaflets\n\nThis pattern of interveinal yellowing + marginal necrosis strongly suggests a vascular/systemic disease. Top candidates: **Verticillium_Wilt**, Late Blight, or Leaf Mold. I'll use my 1 reference view on Verticillium Wilt."
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/merged/LeafNet_300.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "The Verticillium Wilt reference matches well: asymmetric interveinal chlorosis, marginal/tip browning progressing inward, with small dark spots scattered on the leaf surface. The test image shows the same pattern across multiple leaflets at different infection stages \u2014 some just yellowing, one severely necrotized.\n\n```json\n{\"prediction\": \"Verticillium_Wilt\", \"confidence\": 0.68, \"reasoning\": \"Test image shows interveinal chlorosis across multiple tomato leaflets with progressive marginal/tip necrosis and one severely affected leaflet \u2014 hallmark pattern of Verticillium wilt. Reference image confirms the asymmetric yellowing and marginal browning pattern. No concentric rings (ruling out Early Blight), no white mold (ruling out Gray Mold/Late Blight undersides), and no distinct olive mold patches (ruling out Leaf Mold).\"}\n```"
+  }
+]

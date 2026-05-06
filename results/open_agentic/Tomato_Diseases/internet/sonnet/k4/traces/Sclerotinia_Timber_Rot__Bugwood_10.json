@@ -3,26 +3,31 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_q17rhoir.jpg"
+      "file_path": "/tmp/classify_6_kogmap.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato plant with a bleached/dried stem at the center, significant wilting and brown dead foliage throughout, and what appears to be stem girdling. The affected parts are the **stem** and **whole plant collapse**.\n\nTop candidates: Sclerotinia_Timber_Rot (bleached stem, collapse), Southern_Blight (stem base wilting), Alternaria_Black_Molds_Stem_Cankers (dark stem cankers).\n\nLet me view one reference per candidate."
+    "content": "The test image shows a tomato plant with:\n- A central bleached/tan, cracked, collapsed stem\n- Extensive brown desiccated/dead leaves throughout\n- Plant has clearly wilted and collapsed\n- Stem appears bleached, hardened, and cracked\n\nAffected part: **stem**. Top candidates: Sclerotinia_Timber_Rot, Southern_Blight, Alternaria_Black_Molds_Stem_Cankers, Bacterial_Canker_And_Wilt_Of_Tomato.\n\nNow reading one reference per candidate class:"
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/stem/Bugwood_3.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/stem/Bugwood_21.jpg"
     }
+  },
+  {
+    "type": "text",
+    "content": "Sclerotinia reference: bleached/tan stem with dark sclerotia visible, black plastic mulch background - very similar to the test image. Strong match."
   },
   {
     "type": "tool_use",
@@ -32,25 +37,29 @@
     }
   },
   {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Alternaria_Black_Molds_Stem_Cankers/stem/Bugwood_3.jpg"
-    }
-  },
-  {
     "type": "text",
-    "content": "Sclerotinia reference shows fluffy white mycelium + black sclerotia. Southern Blight reference shows bleached/whitish girdled stem. The test image has a bleached dried stem with total plant collapse \u2014 Southern Blight is looking like a strong match. Let me use my 4th view on Southern Blight whole plant."
+    "content": "Southern_Blight reference: shows internal stem tissue, not matching well with test image appearance."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Blight/whole_plant/Bugwood_32.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Alternaria_Black_Molds_Stem_Cankers/stem/Bugwood_4.jpg"
     }
   },
   {
     "type": "text",
-    "content": "**Analysis summary:**\n\n- Test image: bleached/whitened dried stem at soil level, entire plant collapsed with brown dead foliage, black plastic mulch visible (commercial setting), wire trellis supports\n- Sclerotinia reference: white fluffy mycelium + developing black sclerotia \u2014 no visible white fluff in test image\n- Southern Blight stem reference (1575059): bleached/girdled stem at soil line \u2014 very similar to test image stem appearance\n- Southern Blight whole plant reference (1575058): complete plant death/brown dried foliage \u2014 matches overall test scene well\n\nThe bleached, dried-out stem at the soil line with total plant collapse and dead brown foliage, combined with black plastic mulch (typical commercial tomato), aligns most closely with Southern Blight's characteristic soil-line girdling. Sclerotinia remains possible but usually shows more obvious white mycelium on the stem exterior.\n\n```json\n{\"prediction\": \"Southern_Blight\", \"confidence\": 0.58, \"reasoning\": \"Bleached/dried stem girdled at soil line with complete plant collapse and dead brown foliage; black plastic mulch confirms commercial tomato setting. Southern Blight stem reference (1575059) showed identical bleached girdled stem appearance, and whole-plant reference (1575058) matched the overall scene of complete plant death. Sclerotinia is the main alternative but typically shows more visible white mycelium on stem exterior.\"}\n```"
+    "content": "Alternaria reference: dark blackish-brown canker - doesn't match the bleached/tan appearance of the test image stem."
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/stem/Bugwood_4.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "This second Sclerotinia reference confirms the diagnosis: bleached/tan cracked stem with large black sclerotia embedded in the tissue, leading to plant collapse.\n\n**Summary of evidence:**\n\n- Test image shows a bleached/tan, cracked, hardened stem with what appears to be a dark spot (sclerotium) at top, surrounded by completely wilted, brown dead leaves, with black plastic mulch in background.\n- Sclerotinia Bugwood_21 reference: identical bleached stem at soil level with dark sclerotia, same black plastic mulch context.\n- Sclerotinia Bugwood_4 reference: cut stem reveals white bleached tissue with large black sclerotia \u2014 hallmark of Sclerotinia timber rot.\n- Southern_Blight: showed internal stem cut \u2014 less consistent with overall test image.\n- Alternaria: dark black canker, not bleached \u2014 doesn't match.\n\n```json\n{\"prediction\": \"Sclerotinia_Timber_Rot\", \"confidence\": 0.88, \"reasoning\": \"The test image shows a bleached, cracked, hardened stem with a dark spot consistent with a sclerotium, surrounded by completely collapsed and dead/brown leaves, with black plastic mulch in background. This matches Sclerotinia_Timber_Rot reference images closely: bleached/white-tan stem tissue, embedded black sclerotia, and plant collapse. Alternaria shows dark blackish cankers (not bleached), Southern_Blight shows white mycelial mats not clearly present here. Sclerotinia's bleached, hollowed stem with sclerotia is the best match.\"}\n```"
   }
 ]

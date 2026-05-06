@@ -3,29 +3,30 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_s_wrbfz2.jpg"
+      "file_path": "/tmp/classify_xoz7m7r_.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato stem cut longitudinally, revealing severely darkened/necrotic pith and vascular tissue running through the center, with the outer green stem tissue still largely intact. This is a classic diagnostic cross-section image.\n\nKey features:\n- Longitudinal stem section\n- Dark brown to black discoloration of internal pith/vascular tissue\n- Outer cortex still green\n- Discoloration runs full length of visible stem\n\nTop candidates: Southern_Bacterial_Wilt (pith discoloration), Verticillium_Wilt (vascular discoloration in cut stem), Alternaria_Black_Molds_Stem_Cankers (pith streaks).\n\nNow I'll use my 1 reference image view on Southern_Bacterial_Wilt stem:"
+    "content": "The test image shows a tomato stem cut longitudinally, revealing very dark (near-black) internal discoloration of the pith/vascular tissue. The outer cortex remains greenish-white. This is a classic stem cross-section for diagnosis.\n\nTop candidates based on the internal stem discoloration:\n- **Sclerotinia_Timber_Rot**: positive ID by longitudinal stem slicing; hard grayish-black sclerotia inside stem\n- **Verticillium_Wilt**: brown vascular discoloration visible when stems cut lengthwise\n- **Southern_Bacterial_Wilt**: dark/light brown pith discoloration\n\nLet me view the Sclerotinia stem reference since it's the strongest candidate (the dark material inside looks like sclerotia)."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Bacterial_Wilt/stem/Bugwood_13.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/stem/Bugwood_21.jpg"
     }
   },
   {
     "type": "text",
-    "content": "Comparing the reference to the test image:\n\n- **Reference (Southern_Bacterial_Wilt Bugwood_13)**: Shows longitudinal stem section with light brown/tan internal pith discoloration, green outer cortex \u2014 same pattern as test image\n- **Test image**: Same pattern but with much darker (almost black) pith discoloration, suggesting a more advanced stage\n\nThe test image is a classic longitudinal stem dissection showing severe dark brown-to-black pith/vascular discoloration with intact green outer cortex. This matches Southern_Bacterial_Wilt's description: \"interior stem shows dark or light brown discoloration in the pith area.\" The darker color in the test image likely reflects a more advanced stage of pith breakdown/necrosis from bacterial colonization.\n\nAlternaria could also cause pith streaking, but Alternaria lesions are typically on the external stem with concentric ring cankers, not this pure internal pith necrosis pattern.\n\n```json\n{\"prediction\": \"Southern_Bacterial_Wilt\", \"confidence\": 0.65, \"reasoning\": \"Longitudinal stem section showing severe dark brown-to-black discoloration of the pith and vascular tissue throughout the full length of the stem, with the outer green cortex largely intact. This matches the Southern_Bacterial_Wilt symptom description of dark discoloration in the pith area visible when the stem is cut lengthwise. The darker-than-reference coloration reflects advanced-stage pith breakdown from bacterial colonization.\"}\n```"
+    "content": "The reference Sclerotinia image shows exterior bleached stem with black sclerotia on the surface. The test image shows a stem cut longitudinally with very dark (near-black) material filling the interior pith cavity \u2014 which matches exactly the Sclerotinia description: \"Hard, grayish-black sclerotia... embedded within the stem tissue; positive identification achieved by slicing the diseased stem longitudinally.\"\n\nThe external left portion of the cut stem also shows browning/canker consistent with Sclerotinia infection at the stem base.\n\n```json\n{\"prediction\": \"Sclerotinia_Timber_Rot\", \"confidence\": 0.75, \"reasoning\": \"The test image shows a tomato stem cut longitudinally, revealing very dark (near-black) material filling the central pith cavity. This matches the Sclerotinia Timber Rot diagnostic description exactly: 'hard, grayish-black sclerotia embedded within the stem tissue; positive identification achieved by slicing the diseased stem longitudinally.' The outer cortex remains greenish-white while the interior is darkened, consistent with sclerotia colonizing the internal stem cavity.\"}\n```"
   }
 ]

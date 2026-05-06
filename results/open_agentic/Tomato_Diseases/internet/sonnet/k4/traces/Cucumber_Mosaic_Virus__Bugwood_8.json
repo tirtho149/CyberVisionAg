@@ -3,30 +3,20 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_o2u5ix6s.jpg"
+      "file_path": "/tmp/classify_o2f2vvye.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows tomato plant stems with severely distorted, extremely narrow \"shoestring-like\" leaves \u2014 classic viral leaf malformation. No spots, cankers, or fungal growth visible. This strongly points to **Cucumber_Mosaic_Virus**.\n\nLet me read the part index and then check reference images."
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/part_index.md"
-    }
-  },
-  {
-    "type": "text",
-    "content": "The image shows leaf/whole_plant symptoms. Top candidates: **Cucumber_Mosaic_Virus** (shoestring leaves), TSWV, Verticillium_Wilt. Now viewing 4 reference images across 4 classes."
+    "content": "The test image shows a tomato plant with severely distorted, curled, and shoestring-like leaves with no clear spots or lesions. This malformation pattern is classic for a viral disease. Top candidates: **Cucumber_Mosaic_Virus** and **Tomato_Spotted_Wilt_Virus**.\n\nNow I'll check reference images across 4 different classes."
   },
   {
     "type": "tool_use",
@@ -37,29 +27,25 @@
   },
   {
     "type": "text",
-    "content": "CMV reference shows distorted, narrowed leaves with mosaic \u2014 similar pattern to test image. Now checking TSWV as second candidate."
+    "content": "CMV reference matches well - same curled, distorted leaf morphology. Now checking Tomato_Spotted_Wilt_Virus for comparison."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/leaf/Bugwood_10.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/leaf/Bugwood_11.jpg"
     }
   },
   {
     "type": "text",
-    "content": "TSWV shows bronzing and necrotic spots on broad leaves \u2014 very different from the test image. Now checking Verticillium_Wilt."
+    "content": "TSWV shows ring spots and necrosis - very different from the test image. Now checking one more class for completeness."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/leaf/Bugwood_18.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Cucumber_Mosaic_Virus/whole_plant/Bugwood_18.jpg"
     }
-  },
-  {
-    "type": "text",
-    "content": "Verticillium Wilt shows broad wilting/yellowing leaves \u2014 not matching. Final reference: Bacterial_Canker_And_Wilt leaf to complete 4 classes."
   },
   {
     "type": "tool_use",
@@ -70,6 +56,6 @@
   },
   {
     "type": "text",
-    "content": "**Analysis summary:**\n\n- **Test image**: Extremely narrow, shoestring-like leaves, severely distorted and twisted, uniformly green, no spots/lesions/necrosis, small green tomato visible \u2014 classic viral leaf distortion\n- **CMV reference**: Distorted, narrowed leaves matching the test image closely \u2014 the knowledge base explicitly notes \"shoestring-like appearance of leaves\"\n- **TSWV**: Shows bronze/necrotic spots on broad leaves \u2014 ruled out\n- **Verticillium Wilt**: Broad leaves with V-shaped yellowing/wilting \u2014 ruled out\n- **Bacterial Canker**: Brown margin necrosis on broad leaves \u2014 ruled out\n\nThe shoestring leaf deformity (extremely narrow, stringy, twisted leaves) is the hallmark symptom of CMV in tomatoes.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.92, \"reasoning\": \"The test image shows tomato stems with extremely narrow, shoestring-like, twisted and distorted leaves \u2014 uniformly green with no spots, necrosis, or fungal growth. This is the classic 'shoestring' symptom of Cucumber Mosaic Virus, explicitly described in the knowledge base as 'shoestring-like appearance of leaves.' The CMV reference image confirms the same leaf distortion pattern. All other candidates (TSWV, Verticillium Wilt, Bacterial Canker) show broad leaves with spots, necrosis, or yellowing \u2014 none present in the test image.\"}\n```"
+    "content": "**Analysis summary:**\n\n- **Test image**: Tomato plant cut and laid on white background, showing severe leaf malformation, distortion, curling, and shoestring-like narrow leaves. No spots, no necrosis, no mold, no lesions.\n- **CMV reference (Bugwood_1)**: Near-identical match - same crinkled, curled, distorted leaf morphology with no lesions.\n- **TSWV reference**: Ring spots and necrotic lesions - clearly doesn't match.\n- **Bacterial Canker reference**: Marginal necrosis and bird's-eye spots - clearly doesn't match.\n\nThe severe leaf malformation and shoestring-like appearance with no spots or lesions is the hallmark of Cucumber Mosaic Virus on tomato.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.91, \"reasoning\": \"The test image shows severe leaf distortion, curling, and shoestring-like malformation with no spots, necrosis, or mold - classic CMV symptoms. The CMV reference image (Bugwood_1) shows the same crinkled, distorted leaf morphology. TSWV shows ring spots/necrosis (absent here); Bacterial Canker shows marginal necrosis and bird's-eye spots (absent here). CMV is the clear match.\"}\n```"
   }
 ]

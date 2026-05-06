@@ -11,7 +11,7 @@
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_a42zfyor.jpg"
+      "file_path": "/tmp/classify_2a6i82uf.jpg"
     }
   },
   {
@@ -23,25 +23,7 @@
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato field with plants appearing stunted/bushy with somewhat distorted growth - whole plant view. Top candidates from the whole_plant index: Cucumber_Mosaic_Virus, Tomato_Spotted_Wilt_Virus, Bacterial_Wilt, Verticillium_Wilt.\n\nNow viewing one reference from each of 4 different candidate classes:"
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Cucumber_Mosaic_Virus/whole_plant/Bugwood_13.jpg"
-    }
-  },
-  {
-    "type": "text",
-    "content": "Strong match. The CMV reference (Bugwood_1568047) is consecutive with the test image (1568048) \u2014 same field setting, same stunted/bushy spreading plant appearance. Now viewing 3 more from different classes."
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/whole_plant/Bugwood_112.jpg"
-    }
+    "content": "The test image shows a field view with rows of tomato plants exhibiting scattered wilting - some plants appear collapsed while neighbors look healthier. This whole-plant, wilt pattern points to soil-borne diseases. Key candidates: Bacterial_Wilt, Southern_Bacterial_Wilt, Southern_Blight, Verticillium_Wilt.\n\nNow viewing one reference from each of 4 candidate classes:"
   },
   {
     "type": "tool_use",
@@ -54,11 +36,25 @@
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/leaf/Bugwood_18.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Bacterial_Wilt/whole_plant/Bugwood_15.jpg"
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Blight/whole_plant/Bugwood_13.jpg"
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/leaf/LeafNet_265.jpg"
     }
   },
   {
     "type": "text",
-    "content": "**Summary of evidence:**\n\n- **Test image (1568048):** Field-wide rows of tomato plants showing stunted, bushy, spreading growth \u2014 no obvious wilting or necrosis.\n- **CMV reference (1568047):** Consecutive Bugwood ID, same field setting, same stunted/bushy plant morphology. Extremely similar. CMV description matches: \"stunted, bushy\" plants.\n- **TSWV:** Shows close-up bronzing and dark necrotic spots \u2014 doesn't match the field-wide stunted pattern.\n- **Bacterial Wilt:** Shows drooping/collapsing plants \u2014 clearly different.\n- **Verticillium Wilt:** Shows V-shaped yellowing on individual leaves \u2014 clearly different.\n\nThe consecutive Bugwood IDs (1568047/1568048) combined with the identical field setting and stunted/bushy whole-plant morphology make Cucumber_Mosaic_Virus the clear match.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.95, \"reasoning\": \"Test image (Bugwood 1568048) is consecutive with a reference CMV image (1568047), showing the same field setting with rows of stunted, bushy tomato plants. This matches CMV's hallmark whole-plant symptoms: bushy, stunted growth with distorted spreading leaves. Bacterial Wilt, TSWV, and Verticillium Wilt references all show clearly different patterns (drooping, bronzing/necrosis, V-shaped yellowing).\"}\n```"
+    "content": "**Analysis summary:**\n\n- **Test image**: Field-level view showing rows of unstaked, low-growing tomato plants with scattered individual plant collapse/wilting across rows. Affected plants are completely collapsed while neighboring plants remain green and healthy \u2014 classic patchy, sudden-wilt pattern.\n\n- **Bacterial_Wilt ref** (Bugwood_5): Shows severely wilted staked tomatoes \u2014 same sudden complete collapse pattern, matching the test image's wilt character.\n\n- **Southern_Bacterial_Wilt ref** (Bugwood_15): Single collapsed plant close-up \u2014 same type of complete wilt but the test image is a broader field view.\n\n- **Southern_Blight ref** (Bugwood_13): Staked mature plants with plastic mulch \u2014 more mature production system, concentrated patches near soil line expected.\n\n- **Verticillium_Wilt ref** (LeafNet_265): V-shaped yellow leaf lesion \u2014 gradual yellowing rather than the sudden complete collapse visible in the test.\n\n**Reasoning:** The test image's defining feature is sudden, complete collapse of individual plants scattered among healthy plants \u2014 no progressive yellowing (rules out Verticillium_Wilt), no localized soil-line focus (rules out Southern_Blight), no obvious white mycelium. The Bacterial_Wilt pattern (Ralstonia solanacearum) matches best: rapid wilt of entire plants in a scattered field distribution. Southern_Bacterial_Wilt is closely related but the reference set for that class emphasizes base/stem symptoms not visible at this field scale.\n\n```json\n{\"prediction\": \"Bacterial_Wilt\", \"confidence\": 0.52, \"reasoning\": \"Field view showing scattered sudden complete collapse of individual tomato plants while neighbors remain healthy \u2014 the hallmark of bacterial wilt (Ralstonia solanacearum). No progressive yellowing (rules out Verticillium_Wilt), no soil-line mycelium (rules out Southern_Blight), and the rapid total-plant collapse matches Bacterial_Wilt better than the stem-canker focus of Southern_Bacterial_Wilt.\"}\n```"
   }
 ]

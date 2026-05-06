@@ -3,30 +3,20 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_a2566oir.jpg"
+      "file_path": "/tmp/classify_ml1522p3.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows two tomato stems cut longitudinally near the root/soil line, revealing brown internal vascular/pith discoloration. Roots appear brown and decayed. No visible mycelium or sclerotia.\n\nNow let me check the part index and then view reference images."
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/part_index.md"
-    }
-  },
-  {
-    "type": "text",
-    "content": "The image is a stem/root view. Key candidates from the stem+root part index: **Southern_Bacterial_Wilt**, **Alternaria_Black_Molds_Stem_Cankers**, **Sclerotinia_Timber_Rot**, **Southern_Blight**.\n\nThe brown internal pith discoloration in longitudinally-cut stems most suggests Southern_Bacterial_Wilt. Let me verify with references."
+    "content": "The test image shows two tomato stems pulled from soil, displaying the stem base and root system. Key features:\n- Brown/dark internal discoloration of stem tissue (pith/vascular)\n- Damaged, brown roots\n- Stems appear split longitudinally showing internal browning\n- No visible white mycelium, sclerotia, or fungal growth\n\nThis points to a vascular wilt disease. Top candidates: **Southern_Bacterial_Wilt**, **Verticillium_Wilt**, **Bacterial_Wilt**, **Southern_Blight**.\n\nNow viewing one reference from each of 4 candidates:"
   },
   {
     "type": "tool_use",
@@ -36,30 +26,11 @@
     }
   },
   {
-    "type": "text",
-    "content": "Strong match - Southern_Bacterial_Wilt reference shows the same longitudinal stem cut with brown pith discoloration. Let me check one more candidate."
-  },
-  {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Alternaria_Black_Molds_Stem_Cankers/stem/Bugwood_3.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Wilt/stem/Bugwood_3.jpg"
     }
-  },
-  {
-    "type": "text",
-    "content": "Alternaria reference is microscopic spore view - doesn't match the test image at all. Let me check Sclerotinia_Timber_Rot."
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/root/Bugwood_19.jpg"
-    }
-  },
-  {
-    "type": "text",
-    "content": "Sclerotinia shows external browning of stem base without the longitudinal cut revealing brown pith. Now let me check Southern_Blight."
   },
   {
     "type": "tool_use",
@@ -69,7 +40,14 @@
     }
   },
   {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Bacterial_Wilt/root/Bugwood_2.jpg"
+    }
+  },
+  {
     "type": "text",
-    "content": "Southern_Blight shows bleached/whitish internal tissue - quite different from the dark brown pith in the test image.\n\n**Summary of evidence:**\n- Test image: Two stems cut longitudinally showing brown/tan pith discoloration throughout, with brown fibrous roots. Stems are green externally.\n- Southern_Bacterial_Wilt reference (Bugwood_13): Identical presentation - green outer stem with brown pith running the full length when cut longitudinally.\n- Alternaria: Microscopic spore view, irrelevant.\n- Sclerotinia: External browning only, no longitudinal cut showing brown pith.\n- Southern_Blight: Shows whitish bleached internal tissue, not brown pith.\n\nThe symptom description for Southern_Bacterial_Wilt perfectly matches: \"interior stem shows dark or light brown discoloration in the pith area\" and \"brown cankers and root rot with vascular discoloration.\"\n\n```json\n{\"prediction\": \"Southern_Bacterial_Wilt\", \"confidence\": 0.88, \"reasoning\": \"The test image shows two tomato stems cut longitudinally near the soil line, revealing extensive brown/tan discoloration of the pith and vascular tissue throughout the stem interior. Roots are also brown and decayed. This matches Southern_Bacterial_Wilt's key diagnostic feature: 'interior stem shows dark or light brown discoloration in the pith area' with 'brown cankers and root rot with vascular discoloration.' The Southern_Bacterial_Wilt reference image (Bugwood_13) shows an identical presentation of green outer stem with brown internal pith when cut longitudinally. Other candidates were ruled out: Alternaria showed microscopic spores, Sclerotinia showed only external browning, and Southern_Blight showed whitish bleached internal tissue rather than brown.\"}\n```"
+    "content": "The fourth reference image (Southern_Bacterial_Wilt root, Bugwood 5473711) is nearly identical to the test image (Bugwood 5473712) - both show tomato stems pulled from soil against a white background, with dark brown stem-base discoloration and brown fibrous root systems. These are sequential images from the same photo series.\n\nKey matches:\n- White background, plants pulled from soil showing stem+root\n- Extensive brown/dark discoloration at stem base\n- Brown, damaged fibrous roots\n- Green upper stem transitioning to brown at soil line\n\nThe Southern_Bacterial_Wilt symptom description matches: \"base of the plant shows brown cankers and root rot with vascular discoloration.\"\n\n```json\n{\"prediction\": \"Southern_Bacterial_Wilt\", \"confidence\": 0.97, \"reasoning\": \"Test image shows two tomato stems pulled from soil with roots attached against a white background, displaying brown/dark discoloration of the stem base and extensively browned root system. The reference image Bugwood_2.jpg (ID 5473711) from Southern_Bacterial_Wilt/root is a nearly identical photo from the same sequential series (test image is 5473712), showing the same presentation. Symptom description confirms: brown cankers at stem base, root rot with vascular discoloration characteristic of Southern Bacterial Wilt.\"}\n```"
   }
 ]
