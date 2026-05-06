@@ -386,26 +386,28 @@ both ref and test trees in one transfer. Replace any existing local
 `Prepared_Dataset/<Crop>` first if you want a clean swap (committed
 files are restorable via `git checkout` on failure).
 
-### F. Per-crop: generate part_index, wire into run_sweeps, run
+### F. Per-crop: wire into run_sweeps, run
 
-After the data lands locally, run the inline part-index generator from
-step 4 above, then add the crop's `case` block in `run_sweeps.sh`
-(`DATASET`, `EXCLUDE`, `KB_SOURCES`, `REF_DIR`, `TEST_DIR`, `PART_INDEX`,
-optional `IMAGES` override). Then:
+After the data lands locally, add the crop's `case` block in
+`run_sweeps.sh` (`DATASET`, `EXCLUDE`, `KB_SOURCES`, `REF_DIR`,
+`TEST_DIR`, `PART_INDEX`, optional `IMAGES` override). Then:
 
 ```bash
-bash CyberVisionAg/open_agentic/run_sweeps.sh status <crop>     # confirm wiring
-bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing <crop>
+bash CyberVisionAg/open_agentic/run_sweeps.sh status <crop>      # confirm wiring
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing <crop> # auto-regens part_index
 bash CyberVisionAg/open_agentic/run_sweeps.sh results <crop>
 ```
 
+`run-missing` and `run` automatically regenerate
+`<REF_DIR>/part_index.md` from the current `EXCLUDE` list before
+launching, so the agent's part-narrowing hint always reflects the
+post-EXCLUDE class set. No manual part-index step is needed any more.
+The standalone generator is at
+`CyberVisionAg/open_agentic/build_part_index.py` if you want to
+preview the file outside a sweep.
+
 ### Gotchas observed during the Tomato pass
 
-- **Stale `part_index.md` reference**: `run_sweeps.sh` referenced a
-  `part_index.md` file that hadn't been generated yet. The agent's
-  prompt told it to `Read` a non-existent path; the part-narrowing step
-  silently failed. Always generate `part_index.md` (step 4) before
-  enabling the crop in `run_sweeps.sh`.
 - **Silent rate-limit throttling at high `PARALLEL`**: the most
   token-heavy config (`internet × k=8`) hit Anthropic TPM ceilings
   with `PARALLEL=20`, yielding 31 `exit code 1` errors out of 88
@@ -419,6 +421,10 @@ bash CyberVisionAg/open_agentic/run_sweeps.sh results <crop>
   If a crop's per-source accuracy looks lopsided, consider re-prepping
   with `--filename-prefix Bugwood_` (or whichever single source you
   trust) for a tighter eval.
+- **Stale `part_index.md` (historical)**: `run_sweeps.sh` used to
+  reference a `part_index.md` file that hadn't been generated; the
+  agent silently failed the part-narrowing step. Resolved by the
+  auto-regen hook in step F.
 
 ---
 
