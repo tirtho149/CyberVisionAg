@@ -251,10 +251,20 @@ You are given two lists:
 2. EXTRACTED diseases (names found by the pipeline):
 {extracted_names}
 
-For each EXTRACTED disease, decide if it matches any INPUT disease (same disease, \
-possibly different name, alias, or abbreviation). For example, "White Mold" and \
-"Sclerotinia Stem Rot" are the same disease. "Soybean Dwarf Mosaic Virus 2012" and \
-"Soybean dwarf virus" are the same disease.
+For each EXTRACTED disease, decide if it refers to the SAME BIOLOGICAL DISEASE \
+as any INPUT disease. Match by biological identity, not lexical similarity. \
+Use your plant-pathology knowledge to bridge:
+- common name ↔ scientific name (e.g. "Pineapple disease" ↔ "Sett rot" — both \
+  refer to Ceratocystis paradoxa infection of sugarcane setts; "White Mold" ↔ \
+  "Sclerotinia Stem Rot" — both Sclerotinia sclerotiorum)
+- acronym ↔ full name (e.g. "SCMV" ↔ "Sugarcane mosaic virus"; \
+  "SCSMV" / "Streak Mosaic" ↔ "Sugarcane streak mosaic virus")
+- alternative / regional names (e.g. "Black Sigatoka" ↔ "Mycosphaerella fijiensis leaf spot")
+- abbreviated folder names (e.g. "Streak_Mosaic_Scsmv" or \
+  "Bacterial_Wilt_Of_X" — strip underscores, expand acronyms before matching)
+
+Be GENEROUS — if an extracted name plausibly refers to the same pathogen / \
+condition as an input name, match it. Prefer a match over leaving it unmapped.
 
 Return a mapping from each matching extracted name to its corresponding input name. \
 Only include extracted diseases that match an input disease. Skip any that don't match.

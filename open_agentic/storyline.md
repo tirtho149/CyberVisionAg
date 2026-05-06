@@ -281,3 +281,19 @@ python -m CyberVisionAg.open_agentic.plot_confusion_matrix \
 ### Phase 5: Future TODOs
 - [ ] **Registry provenance example in appendix**: Re-run soybean registry pipeline to get a fresh `final_registry.json` with full provenance (value, url, quote triples). Currently the pipeline overwrites the JSON per crop; fix to save per-crop JSONs (like xlsx). Then add a worked example entry to Appendix B showing per-field provenance visually.
 - [ ] **Per-crop registry JSON persistence**: Modify `pipeline.py` to save `{Crop}_final_registry.json` alongside `{Crop}_{track}.xlsx` so provenance is always available.
+
+### Phase 6: Scope to 4 evaluation crops (2026-05-06)
+
+- [x] Added Tomato as 4th evaluation crop (20 classes, 100 test images).
+- [x] Dropped k=16 across the board; main results table + figures use k ∈ {0, 1, 4, 8} only.
+- [x] Recomputed headline metric via `tmp_kb_analysis/compute_headline.py`. Baseline = no-KB k=0; full pipeline = internet-KB k=8. Per-crop pp gain: Soybean +17.6, Corn +18.2, Tomato +23.9, Mango +5.0. **Mean across 4 crops: +16.2pp.** Replaces the old "+15.2pp at full reference budget" claim.
+- [x] Regenerated `tables/table_main_results.tex` from results JSONs (Tomato row, k=16 column dropped).
+- [x] Regenerated `figures/fig4_accuracy_vs_k.pdf` (now 1×4 panels: Soybean / Corn / Tomato / Mango, k ∈ {0,1,4,8}).
+- [x] Regenerated `figures/fig5_model_and_kb.pdf` (4-crop average for cost-accuracy).
+- [x] **New figure 7**: `fig7_split_radar.pdf` — concentric split-radar with 4 nested polygons (one per k), right semicircle = with-KB, left = no-KB, 4 crops mirrored across vertical axis. Top horizontal legend with $k\in\{0,1,4,8\}$ swatches. Added to §6 with `\label{fig:split_radar}`.
+- [x] Updated all "three crops" → "four crops" mentions in main.tex (abstract, intro, dataset, experiments, discussion).
+- [x] Updated all $k{=}16$ → $k{=}8$ caption mentions (Soybean / Corn / Mango confusion matrices).
+- [x] Soybean internet/k=0 result was missing — re-ran via `run_sweeps.sh run-missing soybean`.
+- [ ] Confusion matrices for Soybean / Corn / Mango still reference k=16 baseline numbers if not regenerated; regenerate against k=8 internet-KB results when convenient.
+- [ ] Tomato confusion matrix not yet generated for appendix.
+- [ ] Few-shot baseline rows for Tomato not in `table_fewshot_comparison.tex`; either run few-shot on Tomato or note its absence.

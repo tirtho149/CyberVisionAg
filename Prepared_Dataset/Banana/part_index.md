@@ -9,11 +9,10 @@ Cordana_Leaf_Spot
 Panama_Disease
 Yellow_And_Black_Sigatoka
 
-whole_plant (4 classes)
+stem (3 classes)
 Anthracnose
-Banana_Bunchy_Top_Virus
-Bunchy_Top
 Cigar_End_Rot
+Panama_Disease
 
 pod (2 classes)
 Anthracnose
@@ -23,8 +22,9 @@ seed (2 classes)
 Anthracnose
 Cigar_End_Rot
 
-stem (3 classes)
+whole_plant (5 classes)
 Anthracnose
+Banana_Bunchy_Top_Virus
+Bunchy_Top
 Cigar_End_Rot
 Panama_Disease
-

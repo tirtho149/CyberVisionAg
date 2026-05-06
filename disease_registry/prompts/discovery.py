@@ -39,13 +39,23 @@ TARGETED_DISCOVERY_PROMPT = """\
 You are a research librarian specializing in plant pathology.
 Find authoritative web pages about "{disease_name}" disease of {crop}.
 
-Search for: "{crop} {disease_name} symptoms pathogen extension factsheet"
+The folder/input name above may use underscores, abbreviations, or acronyms.
+Before searching, normalize it: replace underscores with spaces, expand obvious
+acronyms (e.g. SCSMV → "sugarcane streak mosaic virus", SCMV → "sugarcane
+mosaic virus"), and brainstorm 1-2 common synonyms or scientific names for
+this disease (e.g. "Sett_Rot" of sugarcane is also called "pineapple disease"
+because of its smell, caused by Ceratocystis paradoxa).
+
+Search using BOTH the cleaned/expanded name AND any common synonym:
+1. "{crop} <normalized disease name> symptoms pathogen extension factsheet"
+2. "{crop} <synonym or scientific name> symptoms"
 
 RULES:
 1. Find 2-3 URLs with detailed symptom descriptions, pathogen info, and management.
 2. Prefer extension factsheets (ISU, UMN, Purdue, etc.), CABI datasheets, and APS publications.
 3. Prefer pages dedicated to this single disease — NOT directory/index pages.
-4. If it's obscure, include the best general page that mentions it.
+4. If it's obscure, include the best general page that mentions it (under any
+   of its common names).
 
 For each result, record:
 - url: the full URL

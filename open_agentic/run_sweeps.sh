@@ -182,13 +182,21 @@ setup_crop() {
             REF_DIR="CyberVisionAg/Prepared_Dataset/Orange"
             TEST_DIR="CyberVisionAg/Prepared_Dataset/Orange_test"
             PART_INDEX="CyberVisionAg/Prepared_Dataset/Orange/part_index.md"
+            IMAGES=10  # override: 10 test/class on a 2-class set (Huanglongbing + Whisker_Mold)
             QUALITY_CROP="Orange"
             ;;
         wheat)
-            # TODO: prepare dataset (Curated_Local_Dataset/train/Wheat_Diseases exists, but no prepared refs/test yet)
+            # Dataset: 53 input classes on cluster. EXCLUDE drops:
+            #   - cross-crop contamination (Alternaria_Black_Molds_Stem_Cankers, etc.)
+            #   - genus-only / generic (Rust, Smut, Fusarium_Disease, Root_Rot, etc.)
+            #   - non-disease metadata (Resistance_Phenotype__* — quality flags)
+            #   - Wheat_* duplicates of name-without-prefix (Wheat_Stem_Rust = Stem_Rust)
             DATASET="Wheat_Diseases"
-            EXCLUDE="Alternaria_Black_Molds_Stem_Cankers,Bacterial_Brown_Spot_Of_Beancanker_Of_Stone_Fruit,Blumeria_Graminis_F,Cochliobolus_Leaf_Spot,Downy_Mildew,Fusarium_Disease,Fusarium_Graminearum_Schwabe,Fusarium_Wilts,Leaf_Spot,Leaf_Streakblack_Chaff,Parastagonospora_Nodorum,Penicillium_Fungi,Phytophthora_Root_And_Crown_Rots,Resistance_Phenotype,Root_Rot,Rust,Septoria_Leaf_Spot_And_Cankers,Smut,Sooty_Mold,Zymoseptoria_Tritici"
+            EXCLUDE="Alternaria_Black_Molds_Stem_Cankers,Bacterial_Brown_Spot_Of_Beancanker_Of_Stone_Fruit,Blumeria_Graminis_F,Cochliobolus_Leaf_Spot,Downy_Mildew,Fusarium_Disease,Fusarium_Graminearum_Schwabe,Fusarium_Wilts,Leaf_Spot,Leaf_Streakblack_Chaff,Parastagonospora_Nodorum,Penicillium_Fungi,Phytophthora_Root_And_Crown_Rots,Resistance_Phenotype,Resistance_Phenotype__Moderately_Resistant,Resistance_Phenotype__Moderately_Susceptible,Resistance_Phenotype__Resistant,Resistance_Phenotype__Susceptible,Root_Rot,Rust,Septoria_Leaf_Spot_And_Cankers,Smut,Sooty_Mold,Wheat_Barley_Yellow_Dwarf,Wheat_Bunt,Wheat_Cephalosporium_Stripe,Wheat_Stem_Rust,Wheat_Stripe_Rust,Zymoseptoria_Tritici"
             KB_SOURCES=("none" "internet")
+            REF_DIR="CyberVisionAg/Prepared_Dataset/Wheat"
+            TEST_DIR="CyberVisionAg/Prepared_Dataset/Wheat_test"
+            PART_INDEX="CyberVisionAg/Prepared_Dataset/Wheat/part_index.md"
             QUALITY_CROP="Wheat"
             ;;
         *)

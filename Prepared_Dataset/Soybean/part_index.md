@@ -2,82 +2,85 @@
 
 Use this to narrow candidates based on the plant part visible in the test image.
 
-leaf (21 classes)
-Alfalfa_Mosaic_Virus
+leaf (18 classes)
 Anthracnose
 Bacterial_Blight
 Bacterial_Pustule
-Bean_Pod_Mottle_Virus
-Brown_Spot
+Bean_Pod_Mottle_virus
 Brown_Stem_Rot
-Cercospora_Blight
-Downy_Mildew
-Frogeye_Leaf_Spot
+Downy_mildew
+Frogeye_leaf_spot
+Phyllosticta_leaf_spot
 Powdery_Mildew
 Red_Crown_Rot_Of_Soybean
-Rust
-Septoria_Brown_Spot
+Septoria_brown_spot
+Soybean_Cyst_Nematode
 Soybean_Dwarf_Virus
-Soybean_Mosaic_Virus
-Soybean_Rust
-Sudden_Death_Syndrome
-Taproot_Decline_On_Soybean
+Soybean_Vein_necrosis_virus
+Soybean_rust
+Sudden_death_syndrome
 Target_Spot
 Tobacco_Ringspot_Virus
 
-stem (12 classes)
+stem (14 classes)
 Anthracnose
 Brown_Stem_Rot
 Charcoal_Rot
+Fusarium
 Fusarium_Wilts
-Green_Stem
+Green_stem_disorder
 Pod_And_Stem_Blight
+Pythium_damping_off
 Red_Crown_Rot_Of_Soybean
 Rhizoctonia_Damping-Off
-Southern_Blight
-Sudden_Death_Syndrome
+Sudden_death_syndrome
 Tobacco_Ringspot_Virus
+Tobacco_Streak_Virus
 White_Mold
 
-whole_plant (17 classes)
-Alfalfa_Mosaic_Virus
+root (7 classes)
+Charcoal_Rot
+Fusarium
+Fusarium_Wilts
+Phymatotrichum_Root_Rot
+Red_Crown_Rot_Of_Soybean
+Rhizoctonia_Damping-Off
+Soybean_Cyst_Nematode
+
+pod (7 classes)
+Anthracnose
+Bean_Pod_Mottle_virus
+Frogeye_leaf_spot
+Green_stem_disorder
+Purple_Seed_Stain
+Tobacco_Streak_Virus
+White_Mold
+
+seed (5 classes)
+Bean_Pod_Mottle_virus
+Charcoal_Rot
+Purple_Seed_Stain
+Pythium_damping_off
+White_Mold
+
+whole_plant (20 classes)
 Anthracnose
 Brown_Stem_Rot
 Charcoal_Rot
 Damping_Off
+Fusarium
 Fusarium_Wilts
+Green_stem_disorder
 Phymatotrichum_Root_Rot
 Powdery_Mildew
+Pythium_damping_off
 Red_Crown_Rot_Of_Soybean
 Rhizoctonia_Damping-Off
-Septoria_Brown_Spot
-Southern_Blight
+Septoria_brown_spot
 Soybean_Cyst_Nematode
 Soybean_Dwarf_Virus
-Sudden_Death_Syndrome
-Taproot_Decline_On_Soybean
+Soybean_rust
+Sudden_death_syndrome
 Tobacco_Ringspot_Virus
-
-root (7 classes)
-Charcoal_Rot
-Fusarium_Wilts
-Phymatotrichum_Root_Rot
-Red_Crown_Rot_Of_Soybean
-Rhizoctonia_Damping-Off
-Soybean_Cyst_Nematode
-Taproot_Decline_On_Soybean
-
-seed (5 classes)
-Bean_Pod_Mottle_Virus
-Cercospora_Blight
-Charcoal_Rot
-Purple_Seed_Stain
-White_Mold
-
-pod (5 classes)
-Anthracnose
-Bean_Pod_Mottle_Virus
-Green_Stem
 Tobacco_Streak_Virus
 White_Mold
-

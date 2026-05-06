@@ -224,9 +224,10 @@ def figure_4_accuracy_vs_k():
     crops = [
         ("Soybean_Diseases", "Soybean (25 classes)", ["none", "internet"]),
         ("Corn_Diseases", "Corn (30 classes)", ["none", "internet"]),
+        ("Tomato_Diseases", "Tomato (20 classes)", ["none", "internet"]),
         ("Mango_Leaf_Disease", "Mango (4 classes)", ["none", "internet"]),
     ]
-    ks = [0, 1, 4, 8, 16]
+    ks = [0, 1, 4, 8]
 
     method_styles = {
         "none":     {"label": "Agent (no KB)",       "color": "#3498db", "marker": "o", "ls": "-"},
@@ -234,7 +235,7 @@ def figure_4_accuracy_vs_k():
         "local":    {"label": "Agent + local KB",    "color": "#2ecc71", "marker": "^", "ls": "-"},
     }
 
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=False)
+    fig, axes = plt.subplots(1, 4, figsize=(16, 4), sharey=False)
 
     for ax, (crop, title, sources) in zip(axes, crops):
         # Track all accuracy values for dynamic y-axis
@@ -359,7 +360,7 @@ def figure_5_cost_accuracy():
         'legend.fontsize': 10,
     })
 
-    crop_ids = ["Soybean_Diseases", "Corn_Diseases", "Mango_Leaf_Disease"]
+    crop_ids = ["Soybean_Diseases", "Corn_Diseases", "Tomato_Diseases", "Mango_Leaf_Disease"]
     model_colors = {
         "haiku": "#f39c12",
         "sonnet": "#3498db",
@@ -368,7 +369,7 @@ def figure_5_cost_accuracy():
     model_labels = {"haiku": "Haiku", "sonnet": "Sonnet", "opus": "Opus"}
 
     configs = [
-        ("sonnet", 0), ("sonnet", 1), ("sonnet", 4), ("sonnet", 8), ("sonnet", 16),
+        ("sonnet", 0), ("sonnet", 1), ("sonnet", 4), ("sonnet", 8),
         ("haiku", 8), ("opus", 8),
     ]
 
@@ -404,7 +405,7 @@ def figure_5_cost_accuracy():
         )
 
     # Sonnet aggregate bubbles (no line, just bubbles with k-based sizes)
-    for k in [0, 1, 4, 8, 16]:
+    for k in [0, 1, 4, 8]:
         crop_costs, crop_accs = [], []
         for crop_id in crop_ids:
             d = load_summary(crop_id, "internet", "sonnet", k)
@@ -689,6 +690,175 @@ def figure_6_kb_sources():
     print(f"  Saved: {out}")
 
 
+# ── Figure 7: Split radar (single k, one panel — meant to be tiled in LaTeX) ──
+
+def figure_7_split_radar(ks: tuple = (0, 1, 4, 8)):
+    """Concentric split radar — one polygon per k stacked on a single panel.
+
+    Right semicircle = internet-KB. Left semicircle = no-KB. For each k,
+    a single closed polygon connects the 4 KB vertices (right) and 4 no-KB
+    vertices (left). Polygons stack with progressive color depth so the
+    figure tells two stories simultaneously: budget effect (radial growth)
+    and KB effect (left/right asymmetry).
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    plt.rcParams.update({
+        "font.family": "Helvetica",
+        "font.size": 11,
+        "axes.unicode_minus": False,
+    })
+
+    crops = [
+        ("Soybean_Diseases", "Soybean"),
+        ("Corn_Diseases", "Corn"),
+        ("Mango_Leaf_Disease", "Mango"),
+        ("Tomato_Diseases", "Tomato"),
+    ]
+
+    # Right-semicircle angles for KB; mirrored to left for no-KB.
+    kb_deg = [67.5, 22.5, -22.5, -67.5]   # Soybean, Corn, Mango, Tomato
+    nokb_deg = [180 - d for d in kb_deg]
+    kb_rad = np.deg2rad(kb_deg)
+    nokb_rad = np.deg2rad(nokb_deg)
+
+    # Palette — a 4-step warm sequential ramp keyed to k.
+    # Light → dark as k increases. Picked for paper grade (low-chroma but
+    # legible at fill alpha).
+    K_COLORS = {
+        0: "#f4cdb7",   # light peach
+        1: "#e89779",   # salmon
+        4: "#c9573a",   # deep coral
+        8: "#7a2210",   # brick
+    }
+    K_LINE_W = {0: 1.2, 1: 1.5, 4: 1.9, 8: 2.4}
+    K_FILL_A = {0: 0.18, 1: 0.22, 4: 0.28, 8: 0.42}
+
+    HALO_RIGHT = "#fdf3ee"
+    GRID = "#e4e7eb"
+    INK = "#1f2933"
+    KB_TAG = "#7a2210"
+    NOKB_TAG = "#52606d"
+
+    R_MAX = 105
+
+    fig, ax = plt.subplots(figsize=(7.0, 6.4),
+                           subplot_kw=dict(projection="polar"))
+
+    # Right semicircle highlight wash
+    halo_theta = np.linspace(-np.pi / 2, np.pi / 2, 200)
+    ax.fill(halo_theta, [R_MAX] * len(halo_theta),
+            color=HALO_RIGHT, edgecolor="none", zorder=0)
+
+    # Walk-order vertex positions (degrees) for the 8-vertex polygon.
+    deg_order = [22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5]
+    # Mapping: deg → (crop_idx, side). side = 'kb' (right) or 'nokb' (left).
+    label_map = {
+        22.5:  (1, "kb"),    # Corn-KB
+        67.5:  (0, "kb"),    # Soybean-KB
+        112.5: (0, "nokb"),  # Soybean-noKB
+        157.5: (1, "nokb"),  # Corn-noKB
+        202.5: (2, "nokb"),  # Mango-noKB
+        247.5: (3, "nokb"),  # Tomato-noKB
+        292.5: (3, "kb"),    # Tomato-KB
+        337.5: (2, "kb"),    # Mango-KB
+    }
+
+    # Pull all values: per-k dict[crop_idx][side] = accuracy
+    data = {k: {} for k in ks}
+    for k in ks:
+        for i, (crop, _) in enumerate(crops):
+            kb, _ = get_accuracy_and_std(crop, "internet", "sonnet", k)
+            nokb, _ = get_accuracy_and_std(crop, "none", "sonnet", k)
+            data[k][i] = {"kb": kb, "nokb": nokb}
+
+    def vertices_for(k):
+        out = []
+        for d in deg_order:
+            i, side = label_map[d]
+            v = data[k][i][side]
+            if v is None:
+                return None
+            out.append((np.deg2rad(d), v))
+        return out
+
+    # Plot polygons in ascending k so larger (k=8) stacks on top, but
+    # alpha is tuned so all remain visible.
+    for k in ks:
+        verts = vertices_for(k)
+        if verts is None: continue
+        thetas = [t for t, _ in verts] + [verts[0][0]]
+        radii = [r for _, r in verts] + [verts[0][1]]
+        color = K_COLORS[k]
+        ax.fill(thetas, radii, color=color,
+                alpha=K_FILL_A[k], linewidth=0, zorder=2 + (k * 0.1))
+        ax.plot(thetas, radii, color=color,
+                linewidth=K_LINE_W[k], zorder=3 + (k * 0.1),
+                solid_joinstyle="round", solid_capstyle="round")
+        ax.scatter(thetas[:-1], radii[:-1], color=color,
+                   s=24 + 4 * k, zorder=5 + (k * 0.1),
+                   edgecolor="white", linewidths=0.8)
+
+    # Numeric annotations only on the outermost polygon (highest k) to avoid
+    # clutter; place labels just outside each vertex.
+    k_outer = max(ks)
+    verts_outer = vertices_for(k_outer)
+    if verts_outer is not None:
+        for (theta, val), d in zip(verts_outer, deg_order):
+            i, side = label_map[d]
+            color = KB_TAG if side == "kb" else NOKB_TAG
+            ax.text(theta, val + 8, f"{val:.0f}",
+                    ha="center", va="center",
+                    fontsize=10.5, color=color, fontweight="700", zorder=8)
+
+    # Crop labels — bold dark on KB (right), muted gray on no-KB (left).
+    for (theta, (_, name)) in zip(kb_rad, crops):
+        ax.text(theta, R_MAX + 9, name, ha="center", va="center",
+                fontsize=11.5, fontweight="600", color=INK)
+    for (theta, (_, name)) in zip(nokb_rad, crops):
+        ax.text(theta, R_MAX + 9, name, ha="center", va="center",
+                fontsize=10.5, color="#94a3b8")
+
+    # Side method labels at horizontal extremes
+    ax.text(np.deg2rad(0), R_MAX + 22, "with KB",
+            ha="center", va="center", fontsize=12,
+            color=KB_TAG, fontweight="700")
+    ax.text(np.deg2rad(180), R_MAX + 22, "no KB",
+            ha="center", va="center", fontsize=12,
+            color=NOKB_TAG, fontweight="700")
+
+    # Axis cosmetics
+    ax.set_ylim(0, R_MAX)
+    ax.set_yticks([25, 50, 75, 100])
+    ax.set_yticklabels([])
+    ax.set_xticks([])
+    ax.grid(True, color=GRID, linewidth=0.8, alpha=0.9)
+    ax.spines["polar"].set_color(GRID)
+    ax.spines["polar"].set_linewidth(0.8)
+
+    # Legend — 4 swatches in a single horizontal row at the top
+    handles = [
+        Patch(facecolor=K_COLORS[k], alpha=max(K_FILL_A[k] * 1.6, 0.55),
+              edgecolor=K_COLORS[k], linewidth=K_LINE_W[k],
+              label=f"$k$ = {k}")
+        for k in sorted(ks)
+    ]
+    fig.legend(handles=handles, loc="upper center",
+               bbox_to_anchor=(0.5, 0.97),
+               ncol=len(ks), frameon=False, fontsize=11.5,
+               handlelength=1.6, columnspacing=2.0,
+               handletextpad=0.6)
+
+    plt.tight_layout(rect=(0, 0, 1.0, 0.92))
+    out = FIGURES_DIR / "fig7_split_radar.pdf"
+    plt.savefig(out, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"  Saved: {out}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -702,4 +872,6 @@ if __name__ == "__main__":
     figure_5_cost_accuracy()
     print("\nFigure 6: KB sources")
     figure_6_kb_sources()
+    print("\nFigure 7: Split radar (KB vs no-KB) — concentric polygons by k")
+    figure_7_split_radar()
     print("\nDone.")

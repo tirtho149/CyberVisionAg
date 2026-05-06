@@ -1,28 +1,31 @@
 [
   {
-    "type": "text",
-    "content": "I'll start by reading the test image to analyze the symptoms."
+    "type": "tool_use",
+    "tool": "ToolSearch",
+    "input": {
+      "query": "select:Read"
+    }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_ngr5cb5u.jpg"
+      "file_path": "/tmp/classify_iipk1k0_.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a coffee leaf with multiple circular brown spots scattered across it. Now let me view a reference image for Brown_Eye_Spot to confirm."
+    "content": "The test image shows a coffee leaf (upper surface) with multiple circular dark brown spots of varying sizes, and the leaf is noticeably curving/curling. No yellow halos, no grey centers, no pale trails, no powdery lesions.\n\nKey candidates:\n- **Phoma**: circular dark spots of varying sizes on leaves, leaves curve \u2014 matches perfectly\n- **Brown_Eye_Spot**: spots should have grey centers and yellow margins \u2014 not visible here\n\nLet me view one Phoma reference image."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "CyberVisionAg/Prepared_Dataset/Coffee/Brown_Eye_Spot/leaf/PlantWild_13.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Coffee/Phoma/leaf/LeafNet_165.jpg"
     }
   },
   {
     "type": "text",
-    "content": "## Analysis\n\n**Test image observations:**\n- Coffee leaf with multiple discrete, circular brown spots (approximately 5-10mm)\n- Spots have darker brown edges and slightly lighter centers\n- No orange or yellow pustules visible\n- Upper leaf surface affected\n\n**Reference image comparison (Brown_Eye_Spot):**\n- The reference shows the classic circular brown spot with a prominent yellow halo \u2014 a perfect match for the \"eye spot\" pattern\n- The test image spots show the same circular morphology with brown coloring\n\n**Ruling out Rust:**\n- Rust presents as orange-colored uredinia (spore masses) typically on the lower leaf surface\n- No orange coloration or pustules are visible in the test image\n\n**Conclusion:** The test image shows multiple circular brown spots consistent with Brown Eye Spot (*Cercospora coffeicola*), matching the symptom description of \"circular brown spots with dark brown ring and yellow margin.\"\n\n```json\n{\"prediction\": \"Brown_Eye_Spot\", \"confidence\": 0.93, \"reasoning\": \"The test image shows multiple discrete circular brown spots (~5-10mm) on the coffee leaf upper surface, consistent with Brown Eye Spot symptom description. The reference image confirms the characteristic circular dark brown lesion with yellow halo. No orange pustules or chlorotic diffuse patches indicative of Rust are present.\"}\n```"
+    "content": "The Phoma reference shows advanced coalescing necrosis (more severe stage), while the test image shows discrete circular dark spots with a curling leaf \u2014 consistent with an earlier Phoma infection. The curling/curved leaf is a distinctive Phoma indicator mentioned in the symptom description, combined with circular dark-colored spots of varying sizes. The spots lack the grey centers and yellow halos that would indicate Brown_Eye_Spot.\n\n```json\n{\"prediction\": \"Phoma\", \"confidence\": 0.65, \"reasoning\": \"The test image shows multiple circular dark brown spots of varying sizes on a coffee leaf that is visibly curling. The curled leaf combined with circular dark-colored spots of varying sizes matches Phoma's description ('leaves curve and may present cracks when lesions reach edges'). Brown_Eye_Spot was ruled out due to absence of grey centers and yellow halos. Miner lacks the trails/mines. Rust would show yellow/orange powdery lesions on the underside.\"}\n```"
   }
 ]
