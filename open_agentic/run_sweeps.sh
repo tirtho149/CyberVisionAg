@@ -331,6 +331,16 @@ if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
     echo "=== Running: ${DATASET} | family: ${FAMILY} (images/class: ${IMAGES}, seed: ${SEED}) ==="
     echo ""
 
+    # Regenerate part_index.md from the current EXCLUDE list so the agent
+    # sees only valid (non-excluded) classes in the part-narrowing hint.
+    if [ -n "${REF_DIR}" ] && [ -n "${PART_INDEX}" ] && [ -d "${REF_DIR}" ]; then
+        python -m CyberVisionAg.open_agentic.build_part_index \
+            --ref-dir "${REF_DIR}" \
+            --exclude "${EXCLUDE}" \
+            --out "${PART_INDEX}" 2>&1 | sed 's/^/  /'
+        echo ""
+    fi
+
     ran=0
     skipped=0
 

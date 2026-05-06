@@ -2,92 +2,59 @@
 
 Use this to narrow candidates based on the plant part visible in the test image.
 
-leaf (24 classes)
-Alfalfa_Mosaic_Virus
+leaf (13 classes)
 Bacterial_Canker_And_Wilt_Of_Tomato
-Bacterial_Leaf_Spot
 Bacterial_Speck_Of_Tomato
 Cucumber_Mosaic_Virus
-Diaporthe_Vexans_Gratz
 Early_Blight
 Gray_Mold
 Late_Blight
 Leaf_Mold
-Leaf_Mosaic_Virus
-Leaf_Yellow_Virus
 Phytophthora_Blight
-Phytoplasma
 Powdery_Mildew
-Remotididymella_Destructiva
 Septoria_Leaf_Blotch
-Spider_Mites
 Target_Spot
-Tomato_Leaf_Mould
-Tomato_Necrotic_Dwarf_Virus
-Tomato_Ringspot_Virus
 Tomato_Spotted_Wilt_Virus
 Verticillium_Wilt
 
-stem (18 classes)
+stem (11 classes)
 Alternaria_Black_Molds_Stem_Cankers
 Anthracnose
 Bacterial_Canker_And_Wilt_Of_Tomato
-Bacterial_Pith_Necrosis
-Bacterial_Soft_Rot
 Bacterial_Wilt
-Diaporthe_Vexans_Gratz
-Fusarium_Damping-Off
-Fusarium_Wilts
 Gray_Mold
 Phytophthora_Blight
-Rhizoctonia_Damping-Off
 Rhizopus_Soft_Rots
-Sclerotinia_Rots
 Sclerotinia_Timber_Rot
 Southern_Bacterial_Wilt
 Southern_Blight
 Tomato_Spotted_Wilt_Virus
 
-root (5 classes)
-Fusarium_Damping-Off
-Fusarium_Wilts
-Rhizoctonia_Damping-Off
+root (2 classes)
 Southern_Bacterial_Wilt
 Southern_Blight
 
-pod (11 classes)
+pod (6 classes)
 Anthracnose
 Bacterial_Canker_And_Wilt_Of_Tomato
-Bitter_Rot_And_Anthracnose
-Blossom_End_Rot
-Diaporthe_Vexans_Gratz
 Gray_Mold
-Phoma_Blight
 Phytophthora_Blight
-Pythium_Diseases
 Rhizopus_Soft_Rots
 Tomato_Spotted_Wilt_Virus
 
-seed (7 classes)
+seed (6 classes)
 Anthracnose
-Diaporthe_Vexans_Gratz
 Gray_Mold
 Phytophthora_Blight
 Rhizopus_Soft_Rots
 Sclerotinia_Timber_Rot
 Tomato_Spotted_Wilt_Virus
 
-whole_plant (21 classes)
-Alfalfa_Mosaic_Virus
+whole_plant (13 classes)
 Bacterial_Canker_And_Wilt_Of_Tomato
-Bacterial_Pith_Necrosis
 Bacterial_Wilt
-Beet_Curly_Top_Virus
-Blossom_End_Rot
 Cucumber_Mosaic_Virus
 Early_Blight
-Fusarium_Damping-Off
-Fusarium_Wilt
 Gray_Mold
 Late_Blight
 Phytophthora_Blight
@@ -95,7 +62,5 @@ Rhizopus_Soft_Rots
 Sclerotinia_Timber_Rot
 Southern_Bacterial_Wilt
 Southern_Blight
-Tomato_Leaf_Curl_Virus
-Tomato_Necrotic_Dwarf_Virus
 Tomato_Spotted_Wilt_Virus
 Verticillium_Wilt
