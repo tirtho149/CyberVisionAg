@@ -246,29 +246,35 @@ python -m open_agentic.prepare_dataset \
 
 Creates `Prepared_Dataset/{Crop}/{Class}/{part}/img.jpg` (refs) and `Prepared_Dataset/{Crop}_test/{Class}/img.jpg` (test). Check for classes with 0 test images and add them to the exclude list.
 
+> If the source images live on a remote cluster (e.g., ISU Nova), use the **capsule** at [`open_agentic/capsuled_data_prep/`](capsuled_data_prep/) instead of running prepare_dataset locally. See "Cluster workflow" below.
+
 ### 4. Generate part index
 
-Build `part_index.md` from the prepared ref folder structure. This maps plant parts to disease classes so the agent can narrow candidates.
+Build `part_index.md` from the prepared ref folder structure. This maps plant parts to disease classes so the agent can narrow candidates. The format below matches the existing `part_index.md` files in every crop dir (plain headers, no bullets, no `##`).
 
 ```bash
 python -c "
 from pathlib import Path
-ref_dir = Path('CyberVisionAg/Prepared_Dataset/CROP')
-test_dir = Path('CyberVisionAg/Prepared_Dataset/CROP_test')
-test_classes = set(d.name for d in test_dir.iterdir() if d.is_dir())
-parts = {}
-for cls_dir in sorted(ref_dir.iterdir()):
-    if not cls_dir.is_dir() or cls_dir.name not in test_classes: continue
-    for part_dir in cls_dir.iterdir():
-        if part_dir.is_dir() and part_dir.name not in ('rejected', 'test', 'merged'):
-            parts.setdefault(part_dir.name, []).append(cls_dir.name)
-with open(ref_dir / 'part_index.md', 'w') as f:
-    f.write('# Plant Part -> Disease Classes\n\n')
-    f.write('Use this to narrow candidates based on the plant part visible in the test image.\n')
-    for part in sorted(parts):
-        f.write(f'\n## {part} ({len(parts[part])} classes)\n')
-        for cls in sorted(parts[part]):
-            f.write(f'- {cls}\n')
+from collections import defaultdict
+CROP = 'CROP'  # e.g., 'Tomato'
+ROOT = Path(f'CyberVisionAg/Prepared_Dataset/{CROP}')
+PARTS = ['leaf', 'stem', 'root', 'pod', 'seed', 'whole_plant']
+part_to_classes = defaultdict(list)
+for cls_dir in sorted(p for p in ROOT.iterdir() if p.is_dir()):
+    for part in PARTS:
+        part_dir = cls_dir / part
+        if part_dir.exists() and any(part_dir.iterdir()):
+            part_to_classes[part].append(cls_dir.name)
+lines = [f'# Organ Part Index — {CROP}', '',
+         'Use this to narrow candidates based on the plant part visible in the test image.', '']
+for part in PARTS:
+    cs = part_to_classes.get(part, [])
+    if not cs: continue
+    lines.append(f'{part} ({len(cs)} classes)')
+    lines.extend(cs)
+    lines.append('')
+(ROOT / 'part_index.md').write_text('\n'.join(lines))
+print(f'wrote {ROOT}/part_index.md')
 "
 ```
 
@@ -289,6 +295,130 @@ bash CyberVisionAg/open_agentic/run_sweeps.sh results CROPNAME
 - Keep the exclude list consistent across prepare_dataset and run_sweeps.sh.
 - The sweep is resumable (`run-missing` skips completed configs).
 - Approximate costs: KB generation ~$1-2, data preparation ~$3-5, full sweep ~$0 (subscription).
+
+---
+
+## Cluster workflow: prepare a crop's data on a remote machine
+
+Use this when the source dataset is on a cluster and you don't want to copy
+the full image collection to your laptop. The capsule at
+[`capsuled_data_prep/`](capsuled_data_prep/) is a self-contained variant of
+`prepare_dataset.py` that ships KB workbooks and runs against a local input
+directory on the cluster.
+
+Setup details (SSH host, cluster paths, env init, monitoring) live in the
+capsule's [CLUSTER.md](capsuled_data_prep/CLUSTER.md). The summary below is
+the end-to-end playbook used to add Tomato.
+
+### A. One-time: ship the capsule to the cluster
+
+```bash
+# from your local machine (run once per cluster)
+ssh <USER>@<HOST> "mkdir -p /work/<group>/<user>/sage" && \
+scp -r CyberVisionAg/open_agentic/capsuled_data_prep/. \
+       <USER>@<HOST>:/work/<group>/<user>/sage/
+```
+
+The trailing `.` copies contents (including dotfiles like `.env.example`)
+into the destination root.
+
+### B. One-time: set up venv + API key on the cluster
+
+```bash
+ssh <USER>@<HOST>
+cd /work/<group>/<user>/sage
+bash setup.sh             # creates .venv/, installs deps, prompts for ANTHROPIC_API_KEY
+```
+
+Idempotent — safe to re-run.
+
+### C. Per-crop: run prepare_dataset on the cluster (background)
+
+```bash
+ssh <USER>@<HOST> '
+  cd /work/<group>/<user>/sage && \
+  source .venv/bin/activate && \
+  mkdir -p logs out && \
+  nohup python prepare_dataset.py \
+    --input-dir /work/<group>/<owner>/<DatasetRoot>/<Crop> \
+    --output-dir ./out/<Crop> \
+    --max-per-part 5 --test-per-class 5 \
+    --max-inspect-per-class 60 --seed 42 --parallel 12 \
+    > logs/<Crop>.log 2>&1 < /dev/null & \
+  echo "PID=$!"'
+```
+
+Notes (lessons learned from the Tomato run):
+
+- The cluster's source-folder name is usually the bare crop name
+  (`Tomato`, not `Tomato_Diseases`). The capsule's KB lookup strips
+  `_Diseases`/`_Disease`, so `Tomato` resolves to `kb/Tomato/`.
+- The cluster runs Python 3.9; `prepare_dataset.py` already carries
+  `from __future__ import annotations` so PEP 604 annotations work.
+- `nohup` + `< /dev/null` + `&` keeps the run alive after you log out.
+- The log buffers; for live progress use `find out -type f | wc -l`
+  instead of `tail -f`.
+
+### D. Per-crop: monitor
+
+```bash
+# files written so far (more responsive than the buffered log)
+ssh <USER>@<HOST> 'find /work/<group>/<user>/sage/out -type f 2>/dev/null | wc -l'
+
+# done check
+ssh <USER>@<HOST> 'test -f /work/<group>/<user>/sage/out/<Crop>/_tags.csv && echo DONE || echo running'
+
+# end-of-run summary stats
+ssh <USER>@<HOST> 'grep -E "Inspected|Reference|Test|Rejected|Errors" /work/<group>/<user>/sage/logs/<Crop>.log'
+```
+
+### E. Per-crop: pull the prepared data back
+
+```bash
+# from local
+rsync -az \
+  <USER>@<HOST>:'/work/<group>/<user>/sage/out/<Crop> /work/<group>/<user>/sage/out/<Crop>_test' \
+  CyberVisionAg/Prepared_Dataset/
+```
+
+Multi-source rsync trick: quote both paths on the right of `:` to copy
+both ref and test trees in one transfer. Replace any existing local
+`Prepared_Dataset/<Crop>` first if you want a clean swap (committed
+files are restorable via `git checkout` on failure).
+
+### F. Per-crop: generate part_index, wire into run_sweeps, run
+
+After the data lands locally, run the inline part-index generator from
+step 4 above, then add the crop's `case` block in `run_sweeps.sh`
+(`DATASET`, `EXCLUDE`, `KB_SOURCES`, `REF_DIR`, `TEST_DIR`, `PART_INDEX`,
+optional `IMAGES` override). Then:
+
+```bash
+bash CyberVisionAg/open_agentic/run_sweeps.sh status <crop>     # confirm wiring
+bash CyberVisionAg/open_agentic/run_sweeps.sh run-missing <crop>
+bash CyberVisionAg/open_agentic/run_sweeps.sh results <crop>
+```
+
+### Gotchas observed during the Tomato pass
+
+- **Stale `part_index.md` reference**: `run_sweeps.sh` referenced a
+  `part_index.md` file that hadn't been generated yet. The agent's
+  prompt told it to `Read` a non-existent path; the part-narrowing step
+  silently failed. Always generate `part_index.md` (step 4) before
+  enabling the crop in `run_sweeps.sh`.
+- **Silent rate-limit throttling at high `PARALLEL`**: the most
+  token-heavy config (`internet × k=8`) hit Anthropic TPM ceilings
+  with `PARALLEL=20`, yielding 31 `exit code 1` errors out of 88
+  images. Symptom: log shows `errors=31` and the displayed accuracy
+  drops sharply only at the heaviest config. Fix: rerun just that
+  config (delete its `summary.json`, re-run `run-missing`), optionally
+  with `PARALLEL=12` while the cluster's TPM situation is unknown.
+- **Source-mix in test images**: when refs and test images come from
+  different upstream sources (Bugwood vs PlantVillage vs CDDM), accuracy
+  drops on the small-tile sources because of resolution/style mismatch.
+  If a crop's per-source accuracy looks lopsided, consider re-prepping
+  with `--filename-prefix Bugwood_` (or whichever single source you
+  trust) for a tighter eval.
 
 ---
 
