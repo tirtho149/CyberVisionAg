@@ -3,29 +3,30 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_7f26olzj.jpg"
+      "file_path": "/tmp/classify_p0x46_j4.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a green tomato leaf with:\n- A central pinkish-brown angular lesion (~1-2cm) with a lighter center, appearing water-soaked\n- Smaller pinkish spots scattered upper-left\n- Lesion appears bounded/angular (possibly vein-delimited)\n\nThe angular shape and pinkish water-soaked appearance strongly suggest bacterial infection. Top candidates: Bacterial_Canker_And_Wilt_Of_Tomato or Tomato_Spotted_Wilt_Virus.\n\nLet me check Bacterial_Canker reference:"
+    "content": "**Test image analysis:**\n- Large dark green leaf (single, broad - possibly tomato or similar)\n- Central lesion: pinkish-brown, angular/triangular (vein-bounded), with lighter center\n- Upper-left: scattered smaller pinkish spots\n- No concentric rings, no fuzzy mycelium, no powdery coating\n\nAngular vein-bounded lesion with pinkish-brown color + scattered small spots suggests bacterial canker or similar. Let me check a reference."
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Canker_And_Wilt_Of_Tomato/merged/Bugwood_1.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Canker_And_Wilt_Of_Tomato/merged/Bugwood_4.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The Bacterial_Canker reference shows marginal necrosis and wilting \u2014 not matching the test image which shows isolated pinkish angular spots on an otherwise healthy, large green leaf.\n\n**Analysis of test image:**\n- Large, broadly rounded dark green leaf (possibly broad tomato variety)\n- Central pinkish-salmon angular lesion (~1.5cm) with lighter center \u2014 appears water-soaked\n- Smaller scattered pinkish spots upper-left\n- No yellowing halos, no marginal browning\n\nThe pinkish/salmon water-soaked lesions with lighter centers are consistent with **Tomato_Spotted_Wilt_Virus (TSWV)**, which causes water-soaked bronze-pink spots in early stages before turning fully brown. The angular shape can occur when lesions are vein-bounded. The bacterial canker reference doesn't match well (shows marginal scorch, not discrete spots).\n\n```json\n{\"prediction\": \"Tomato_Spotted_Wilt_Virus\", \"confidence\": 0.38, \"reasoning\": \"The test image shows pinkish-salmon water-soaked angular lesions on a large green leaf with a lighter center in the main spot. TSWV causes water-soaked bronze/pink spots in early stages on solanaceous plants. The bacterial canker reference showed marginal necrosis inconsistent with these discrete spots. Other candidates (bacterial speck, septoria) typically show darker lesions or distinct halos not visible here.\"}\n```"
+    "content": "**Reference comparison:** The Bacterial_Canker reference shows whole-leaf yellowing/wilting with brown margins - this doesn't match the test image well. The test image shows a distinct, isolated angular lesion on an otherwise healthy dark green leaf.\n\n**Reassessing with full analysis:**\n- Test image: one angular (triangular, vein-bounded) pinkish-salmon lesion with lighter center, plus scattered small pinkish spots upper-left on a large dark green leaf\n- The angular vein-bounded shape still points to bacterial disease\n- The pinkish/salmon coloration with lighter center and small satellite spots is consistent with early **Bacterial_Canker_And_Wilt_Of_Tomato** leaf lesions (\"bird's eye\" type)\n- The reference showed wilt-stage symptoms, but early leaf lesions of bacterial canker can appear as isolated angular spots\n- Rules out: Gray Mold (no fuzzy mycelium), Powdery Mildew (no white coating), Early Blight (no concentric rings), Septoria (wrong shape/color pattern)\n\n```json\n{\"prediction\": \"Bacterial_Canker_And_Wilt_Of_Tomato\", \"confidence\": 0.35, \"reasoning\": \"The test image shows a single angular, vein-bounded pinkish-salmon lesion with a lighter center on a large dark green leaf, plus scattered small pinkish spots. The angular (vein-delimited) shape is characteristic of bacterial diseases. The pinkish-tan color with lighter center matches early bacterial canker leaf lesions. Other candidates (Septoria, Gray Mold, Powdery Mildew, Early Blight) are ruled out by absence of their signature features. Confidence is moderate due to limited reference views and the reference image showing a different symptom stage.\"}\n```"
   }
 ]

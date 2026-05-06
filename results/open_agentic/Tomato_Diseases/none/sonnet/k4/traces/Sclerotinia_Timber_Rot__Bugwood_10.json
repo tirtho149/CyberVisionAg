@@ -3,19 +3,31 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_da38tni9.jpg"
+      "file_path": "/tmp/classify_looi40uj.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato plant that has completely collapsed. Key features:\n- Stem lying horizontal with a prominent tan/pale canker-like lesion\n- All leaves brown, wilted, and dead\n- Stem collapse appears at a node/junction\n- Black plastic mulch in background (field/greenhouse production)\n\nThis pattern of stem rot causing plant collapse narrows candidates to: Southern_Blight, Sclerotinia_Timber_Rot, Bacterial_Canker_And_Wilt_Of_Tomato, and Phytophthora_Blight. Let me view one reference from each."
+    "content": "The test image shows a tomato plant with a severely bleached/tan stem lesion, extensive wilting/brown leaf death, and what appears to be a dark spot on the stem. The stem appears girdled/rotted at the lower section. This suggests stem rot diseases.\n\nTop candidates: Sclerotinia_Timber_Rot (bleached stem), Southern_Blight (stem base lesion), Phytophthora_Blight (stem rot + plant collapse), Bacterial_Canker_And_Wilt_Of_Tomato.\n\nNow viewing one reference from each of 4 different classes:"
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/merged/Bugwood_12.jpg"
+    }
+  },
+  {
+    "type": "text",
+    "content": "Strong match. The Sclerotinia reference (Bugwood_5472861) is nearly identical to the test image (Bugwood_5472862) \u2014 same setting, same bleached stem lesion, same black plastic mulch, same wire trellis. These are consecutive Bugwood IDs from the same series.\n\nViewing 3 more references from different classes as required:"
   },
   {
     "type": "tool_use",
@@ -28,25 +40,18 @@
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/merged/Bugwood_16.jpg"
-    }
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Canker_And_Wilt_Of_Tomato/merged/Bugwood_4.jpg"
-    }
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
       "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Phytophthora_Blight/merged/Bugwood_21.jpg"
     }
   },
   {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Canker_And_Wilt_Of_Tomato/merged/Bugwood_1.jpg"
+    }
+  },
+  {
     "type": "text",
-    "content": "Analyzing all four references against the test image:\n\n- **Southern Blight**: Shows white cottony mycelium at soil line \u2014 not present in test image\n- **Sclerotinia_Timber_Rot**: Black sclerotia on/in stem \u2014 the test stem shows tan/bleached coloration with possible dark spots, consistent with Sclerotinia stem rot\n- **Bacterial_Canker**: Shows leaf yellowing/marginal necrosis \u2014 doesn't match the stem collapse pattern\n- **Phytophthora_Blight**: Shows dark brown/black water-soaked streaking lesions \u2014 test stem is more pale/tan than dark\n\nThe test image shows a complete plant collapse with a **pale/bleached tan stem** lying horizontal \u2014 the hallmark of Sclerotinia white mold (timber rot), which bleaches stem tissue and causes collapse. The dark spot visible on the stem could be a sclerotium embedded in the cortex.\n\n```json\n{\"prediction\": \"Sclerotinia_Timber_Rot\", \"confidence\": 0.58, \"reasoning\": \"Test image shows complete tomato plant collapse with a pale/bleached tan horizontal stem \u2014 consistent with Sclerotinia stem rot, which bleaches stem tissue and causes sudden collapse. No white mycelium visible to confirm Southern Blight, stem is too pale for Phytophthora dark lesions, and Bacterial Canker doesn't produce this collapse pattern.\"}\n```"
+    "content": "**Analysis summary:**\n\n- **Test image**: Tomato plant with bleached/tan stem lesion, extensive wilting, black plastic mulch, wire trellis \u2014 Bugwood ID 5472862\n- **Sclerotinia_Timber_Rot** reference (Bugwood_5472861): Near-identical \u2014 consecutive ID, same greenhouse setup, same stem bleaching and wilt pattern. Clear match.\n- **Southern_Blight**: Shows white cottony mycelium on pulled-up root \u2014 no match\n- **Phytophthora_Blight**: Dark stem lesion on pepper in sandy soil \u2014 no match\n- **Bacterial_Canker**: Marginal leaf necrosis \u2014 no match\n\n```json\n{\"prediction\": \"Sclerotinia_Timber_Rot\", \"confidence\": 0.97, \"reasoning\": \"The test image (Bugwood 5472862) and the Sclerotinia_Timber_Rot reference (Bugwood 5472861) are consecutive IDs from the same photo series, with identical settings: greenhouse with black plastic mulch, wire trellis, and the characteristic bleached/tan girdling stem lesion with extensive plant collapse. All other candidate classes show clearly different symptom patterns.\"}\n```"
   }
 ]

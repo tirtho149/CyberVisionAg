@@ -329,6 +329,24 @@ print(f'{n}/{t} ({acc:.1f}%)')
     fi
 }
 
+# ── print-config ──────────────────────────────────────────────────────────────
+# Emit the canonical per-crop config as KEY=VALUE so any other tool (cluster
+# prepare_dataset, KB regen, capsule scripts) can `eval $(... print-config <crop>)`
+# instead of redefining EXCLUDE / DATASET / paths.
+if [ "${COMMAND}" = "print-config" ]; then
+    printf 'CROP=%q\n'        "${CROP}"
+    printf 'DATASET=%q\n'     "${DATASET}"
+    printf 'EXCLUDE=%q\n'     "${EXCLUDE}"
+    printf 'KB_SOURCES=%q\n'  "${KB_SOURCES[*]}"
+    printf 'K_LIST=%q\n'      "${K_LIST[*]}"
+    printf 'REF_DIR=%q\n'     "${REF_DIR}"
+    printf 'TEST_DIR=%q\n'    "${TEST_DIR}"
+    printf 'PART_INDEX=%q\n'  "${PART_INDEX}"
+    printf 'IMAGES=%q\n'      "${IMAGES}"
+    printf 'QUALITY_CROP=%q\n' "${QUALITY_CROP}"
+    exit 0
+fi
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if [ "${COMMAND}" = "run" ] || [ "${COMMAND}" = "run-missing" ]; then
     echo "=== Running: ${DATASET} | family: ${FAMILY} (images/class: ${IMAGES}, seed: ${SEED}) ==="

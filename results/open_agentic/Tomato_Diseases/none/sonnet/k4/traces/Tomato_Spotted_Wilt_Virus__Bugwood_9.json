@@ -3,20 +3,19 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read",
-      "max_results": 1
+      "query": "select:Read"
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_eogjz4j4.jpg"
+      "file_path": "/tmp/classify_0ux20my9.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato/pepper plant with mosaic/mottling patterns \u2014 yellow-green patchwork on leaves, some leaf distortion/crinkling, no discrete spots or fungal lesions. This points toward a viral disease. Top candidates: **Cucumber_Mosaic_Virus**, **Tomato_Spotted_Wilt_Virus**. Also checking **Verticillium_Wilt** and **Bacterial_Wilt** for comparison."
+    "content": "The test image shows: leaves with yellow/green mosaic mottling, irregular chlorotic patches, and mild leaf distortion. No fungal growth, no necrotic spots, no wilting. Strong viral symptom profile.\n\nTop candidates: Cucumber_Mosaic_Virus (mosaic + leaf distortion), Tomato_Spotted_Wilt_Virus (mottling + bronzing), Verticillium_Wilt (yellowing). Let me check reference images across 4 classes."
   },
   {
     "type": "tool_use",
@@ -36,18 +35,18 @@
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Cucumber_Mosaic_Virus/merged/Bugwood_14.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/merged/LeafNet_300.jpg"
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Verticillium_Wilt/merged/LeafNet_300.jpg"
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Cucumber_Mosaic_Virus/merged/Bugwood_14.jpg"
     }
   },
   {
     "type": "text",
-    "content": "Based on my analysis:\n\n- **Test image**: Pepper-like plant with systemic yellow-green mosaic/mottling, mild leaf distortion, no discrete spots or lesions. Classic viral symptom pattern.\n- **CMV ref 1** (Bugwood_1): Severe shoestring/fern-leaf distortion on tomato \u2014 more extreme than test, but same virus type.\n- **TSWV ref**: Severe bronzing/wilting of whole plant \u2014 doesn't match.\n- **Verticillium Wilt ref**: Marginal yellowing/browning on leaf \u2014 doesn't match the mosaic pattern.\n\nThe test image clearly shows a **mosaic virus** pattern (irregular yellow-green patchwork, mild distortion, systemic distribution). Among the 19 classes, **Cucumber_Mosaic_Virus** is the best match \u2014 the symptoms align with CMV on pepper/tomato even if less severe than some reference images.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.68, \"reasoning\": \"The test image shows a plant with classic viral mosaic symptoms: irregular yellow-green mottling/patchwork across multiple leaves, mild leaf distortion, and systemic distribution. No discrete fungal lesions, spots, or wilting. This pattern is most consistent with Cucumber_Mosaic_Virus among the 19 classes. TSWV shows bronzing/necrosis; Verticillium Wilt shows marginal yellowing not mosaic; no other class fits the mosaic mottling pattern.\"}\n```"
+    "content": "**Analysis summary:**\n\n- **Test image**: Leaves with yellow-green mosaic mottling, irregular chlorotic patches, mild leaf distortion/puckering. No necrosis, no fungal growth, no stem wilting. Classic viral symptom profile.\n- **CMV (Bugwood_1)**: Shows severe shoestring leaf distortion \u2014 more extreme than test, but same disease category.\n- **CMV (Bugwood_14)**: Field overview, not directly comparable.\n- **TSWV (Bugwood_3)**: Severe wilting and bronzing \u2014 clearly doesn't match.\n- **Verticillium_Wilt (LeafNet_300)**: V-shaped marginal yellowing from leaf edge \u2014 doesn't match mosaic pattern.\n\nThe mosaic/mottling pattern with yellow-green patches and mild leaf distortion is most consistent with **Cucumber_Mosaic_Virus**. TSWV shows bronzing and necrotic ringspots, not mosaic. All fungal and bacterial candidates lack this mosaic character entirely.\n\n```json\n{\"prediction\": \"Cucumber_Mosaic_Virus\", \"confidence\": 0.68, \"reasoning\": \"Test image shows yellow-green mosaic mottling with irregular chlorotic patches and mild leaf distortion across broad leaves \u2014 classic CMV symptom profile. TSWV was ruled out (bronzing/ringspots absent). All fungal/bacterial classes lack mosaic character. CMV reference shows more severe distortion but the mosaic mottling pattern is consistent.\"}\n```"
   }
 ]

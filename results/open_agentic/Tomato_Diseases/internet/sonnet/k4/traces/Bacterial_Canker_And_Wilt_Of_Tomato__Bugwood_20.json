@@ -3,30 +3,20 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_u9_j64m1.jpg"
+      "file_path": "/tmp/classify_iflvauav.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato stem with small white/crusty deposits scattered along it, with otherwise green healthy-looking tissue. The stem is the affected plant part. Let me check the part index and then view reference images."
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/part_index.md"
-    }
-  },
-  {
-    "type": "text",
-    "content": "The stem is the affected part. Relevant stem candidates from the 19-class list: Alternaria_Black_Molds_Stem_Cankers, Bacterial_Canker_And_Wilt_Of_Tomato, Bacterial_Wilt, Gray_Mold, Phytophthora_Blight, Rhizopus_Soft_Rots, Sclerotinia_Timber_Rot, Southern_Bacterial_Wilt, Southern_Blight, Tomato_Spotted_Wilt_Virus.\n\nThe white crusty/powdery deposits scattered on the stem are the key feature. Top candidates: Sclerotinia_Timber_Rot (white cotton mycelium), Southern_Blight (white fungal mats), Bacterial_Canker_And_Wilt_Of_Tomato (canker lesions), and Powdery_Mildew. Let me view one reference from each of my top 4 candidates."
+    "content": "The test image shows a tomato **stem** with small white/pale deposits or spots scattered along it. The leaves in the background appear somewhat distorted/curled. Key features:\n- Affected part: stem\n- Small whitish/pale deposits distributed along stem sections\n- Leaves appear slightly curled/distorted\n- No obvious dark cankers or mycelium visible\n\nTop candidates: Bacterial_Canker_And_Wilt_Of_Tomato (white bird's-eye spots), Powdery_Mildew (white powdery coating), Tomato_Spotted_Wilt_Virus (stem + distorted leaves), Cucumber_Mosaic_Virus (leaf distortion).\n\nNow viewing one reference per class:"
   },
   {
     "type": "tool_use",
@@ -39,25 +29,25 @@
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Sclerotinia_Timber_Rot/stem/Bugwood_21.jpg"
-    }
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Southern_Blight/stem/Bugwood_15.jpg"
-    }
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
       "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Powdery_Mildew/leaf/CDDM_1146.jpg"
     }
   },
   {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Tomato_Spotted_Wilt_Virus/stem/Bugwood_185.jpg"
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Cucumber_Mosaic_Virus/leaf/Bugwood_1.jpg"
+    }
+  },
+  {
     "type": "text",
-    "content": "**Analysis:**\n\n- **Test image**: Tomato stem with small white crusty/powdery deposits scattered along it. Stem otherwise green and healthy; trichomes (hairs) visible.\n- **Bacterial Canker (ref)**: Shows internal brown vascular damage \u2014 not matching.\n- **Sclerotinia Timber Rot (ref)**: White bleaching at stem base near soil with dark sclerotia \u2014 wrong location and pattern.\n- **Southern Blight (ref)**: Extensive bleached lesion girdling stem \u2014 not matching.\n- **Powdery Mildew (ref)**: White powdery coating on leaf surfaces \u2014 the white powdery/crusty texture is closest to what's seen on the stem.\n\nThe discrete white deposits on the green stem, without necrosis, cankers, or mycelial mats, best match early Powdery Mildew colonies forming on the stem surface. The symptom description confirms \"white powdery coating\" that expands to cover tissue, consistent with the scattered white deposits visible here.\n\n```json\n{\"prediction\": \"Powdery_Mildew\", \"confidence\": 0.42, \"reasoning\": \"The test image shows a green tomato stem with small discrete white crusty/powdery deposits scattered along its surface. This white powdery growth on otherwise-green plant tissue is most consistent with Powdery Mildew colonies. Other stem candidates (Sclerotinia, Southern Blight, Bacterial Canker) show large necrotic lesions, extensive white mycelial mats at the soil line, or internal vascular damage, none of which match the scattered small white surface deposits observed. Confidence is moderate because the deposits appear on a stem while reference images are from leaves, and the deposits are more crusty/discrete than typical fluffy powdery mildew.\"}\n```"
+    "content": "**Analysis of the 4 references vs. test image:**\n\n- **Bacterial_Canker stem**: Shows internal brown vascular tissue (split stem) \u2014 doesn't match the exterior white deposits on the test stem\n- **Powdery_Mildew leaf**: Shows diffuse white/gray powdery coating on leaf surface \u2014 possible stem analog\n- **TSWV stem**: Shows severe brown streaking and dead/dried tissue \u2014 doesn't match\n- **CMV leaf**: Shows severe shoestring/distortion of leaves \u2014 background leaves in test image are distorted but not as extreme\n\n**Reasoning:**\nThe test image shows a tomato stem with small white/pale deposits scattered along its surface, with the leaves in the background appearing moderately distorted/curled. The white deposits are key. They don't match the internal brown vascular rot of Bacterial Canker, nor the severe streaking of TSWV. They look like small whitish powdery/crusty spots on a still-green stem. The leaf distortion in the background is moderate, not the shoestring pattern typical of CMV.\n\nThe small white deposits on the stem, combined with moderate leaf distortion, are most consistent with **Bacterial_Canker_And_Wilt_Of_Tomato** \u2014 specifically the early stem pustular/lenticel deposits that precede full canker development. The leaves show some wilting/curling consistent with early bacterial infection. Powdery mildew is the next best candidate but typically forms a more dense/diffuse white coating.\n\n```json\n{\"prediction\": \"Bacterial_Canker_And_Wilt_Of_Tomato\", \"confidence\": 0.32, \"reasoning\": \"The test image shows a tomato stem with small white/pale deposits scattered along its surface and moderately distorted/curled leaves in the background. The white deposits on the stem are consistent with early Bacterial Canker pustular lenticel symptoms rather than the brown cankers seen in advanced cases. TSWV showed severe browning/streaking, CMV showed extreme leaf shoestringing, and Powdery Mildew showed diffuse coating \u2014 none match as well as Bacterial Canker's stem involvement with accompanying plant stress.\"}\n```"
   }
 ]

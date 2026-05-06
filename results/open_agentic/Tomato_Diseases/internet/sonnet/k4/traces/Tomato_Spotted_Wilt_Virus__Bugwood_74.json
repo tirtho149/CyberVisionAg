@@ -3,19 +3,20 @@
     "type": "tool_use",
     "tool": "ToolSearch",
     "input": {
-      "query": "select:Read"
+      "query": "select:Read",
+      "max_results": 1
     }
   },
   {
     "type": "tool_use",
     "tool": "Read",
     "input": {
-      "file_path": "/tmp/classify_yxz7coy3.jpg"
+      "file_path": "/tmp/classify_3h740qi9.jpg"
     }
   },
   {
     "type": "text",
-    "content": "The test image shows a tomato leaf with:\n- Overall bronzed/darkened appearance\n- Numerous tiny dark spots/lesions scattered across the surface\n- Mottled texture throughout the leaf\n- No yellow halos, no white coating, no concentric rings\n\nTop candidates: **Tomato_Spotted_Wilt_Virus** (bronzing + tiny necrotic spots), **Bacterial_Speck_Of_Tomato** (small dark specks), **Septoria_Leaf_Blotch** (dark lesions).\n\nNow viewing one reference per candidate:"
+    "content": "The test image shows a tomato leaf with:\n- Bronzed/darkened upper leaf surface\n- Small dark necrotic spots scattered across the leaf\n- Ring-like patterns visible on the surface\n- Leaf appears somewhat distorted/puckered\n\nThis strongly suggests **Tomato_Spotted_Wilt_Virus** (bronzing + necrotic spots on upper surface). Let me check reference images across 4 classes."
   },
   {
     "type": "tool_use",
@@ -25,32 +26,6 @@
     }
   },
   {
-    "type": "text",
-    "content": "TSWV reference shows ring patterns - the test image has more uniform fine dark speckles/bronzing, not rings. Checking Bacterial_Speck next:"
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Speck_Of_Tomato/leaf/Bugwood_5.jpg"
-    }
-  },
-  {
-    "type": "text",
-    "content": "Bacterial Speck shows larger distinct spots - less like the test image's fine uniform speckling. Checking Septoria:"
-  },
-  {
-    "type": "tool_use",
-    "tool": "Read",
-    "input": {
-      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Septoria_Leaf_Blotch/leaf/CDDM_1928.jpg"
-    }
-  },
-  {
-    "type": "text",
-    "content": "Septoria shows larger well-defined circular lesions - not matching. Let me use my final reference view to check CMV, as the mottling could indicate that:"
-  },
-  {
     "type": "tool_use",
     "tool": "Read",
     "input": {
@@ -58,7 +33,21 @@
     }
   },
   {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Powdery_Mildew/leaf/CDDM_78.jpg"
+    }
+  },
+  {
+    "type": "tool_use",
+    "tool": "Read",
+    "input": {
+      "file_path": "/Users/muhammadarbabarshad/build2026-local/AgCrawler/CyberVisionAg/Prepared_Dataset/Tomato/Bacterial_Speck_Of_Tomato/leaf/Bugwood_14.jpg"
+    }
+  },
+  {
     "type": "text",
-    "content": "**Analysis summary:**\n\n- **CMV reference**: Shows distorted, narrow shoestring-like leaves - clearly different from the test image's intact leaf.\n- **Test image features**: Intact tomato leaf with overall dark bronzing + numerous tiny dark speckles with blurred (indistinct) margins uniformly spread across the surface. No yellow halos, no white powder, no distinct concentric rings, no angular angular lesions.\n\n**Matching against candidates:**\n- **TSWV**: \"Leaves appear bronzed with small brown lesions or necrotic spots; lesions caused by TSWV have blurred margins; young leaves develop bronzing on upper surfaces followed by distinct necrotic spots.\" - This matches the test image most closely: the bronze-darkened leaf + fine dark spots with no sharp margins.\n- **Bacterial Speck**: Larger discrete black spots with angular edges and yellow halos - doesn't match the fine diffuse speckling seen.\n- **Septoria**: Circular tan-gray lesions with dark centers - not matching.\n- **CMV**: Leaf distortion/shoestring and mosaic - not matching.\n\n```json\n{\"prediction\": \"Tomato_Spotted_Wilt_Virus\", \"confidence\": 0.65, \"reasoning\": \"The leaf shows classic TSWV bronzing: overall dark/bronze discoloration of the upper leaf surface with numerous tiny dark necrotic flecks having blurred (indistinct) margins, which the KB explicitly flags as the key diagnostic feature distinguishing TSWV from other spot diseases. The leaf is intact (not distorted), ruling out CMV. No yellow halos (rules out bacterial speck), no distinct concentric rings (rules out Septoria/early blight), no white powder (rules out powdery mildew).\"}\n```"
+    "content": "**Analysis summary:**\n\n- **Test image**: Tomato leaf with pronounced bronze/dark coloration on upper surface, dense small dark necrotic spots scattered throughout, ring-like patterns on the leaf surface, some leaf puckering/distortion.\n\n- **TSWV reference**: Shows concentric ring-spot patterns with brown necrotic spots \u2014 consistent with the ring patterns and necrotic spots in the test image. Bronzing on upper surface is the hallmark diagnostic feature.\n\n- **CMV reference**: Stunted shoestring-like distorted leaves \u2014 no match.\n\n- **Powdery Mildew reference**: White powdery coating \u2014 no match.\n\n- **Bacterial Speck reference**: Discrete black spots with yellow halos on green leaf \u2014 not the diffuse bronzing pattern seen in test image.\n\nThe test image's dense bronzing and small dark necrotic spots on the upper leaf surface, with visible ring patterns, align most closely with **Tomato_Spotted_Wilt_Virus**, which is specifically described as: \"Infected leaves appear bronzed with small brown lesions or necrotic spots... Young leaves develop bronzing on upper surfaces followed by distinct necrotic spots.\"\n\n```json\n{\"prediction\": \"Tomato_Spotted_Wilt_Virus\", \"confidence\": 0.72, \"reasoning\": \"The leaf shows characteristic TSWV bronzing on the upper surface with dense small dark necrotic spots throughout and visible ring-like patterns. The overall bronze/dark discoloration with embedded necrotic spots matches the TSWV description of bronzing followed by distinct necrotic spots. Other candidates (CMV, Powdery Mildew, Bacterial Speck) show clearly different symptom patterns.\"}\n```"
   }
 ]
