@@ -155,7 +155,10 @@ setup_crop() {
             # Miner/Phoma (excluded by quality judge). Leaves 2 classes: Brown_Eye_Spot, Rust.
             # Prepared via prepare_dataset (max-per-part 3, test-per-class 5, 2026-04-25).
             DATASET="Coffee_Diseases"
-            EXCLUDE="Berry_Blotch,Black_Rot,Cerscospora,Miner,Phoma"
+            # KB regenerated 2026-05 with full 7-class coverage; all classes
+            # now have symptom descriptions, so the previous EXCLUDE
+            # (Berry_Blotch, Black_Rot, Cerscospora, Miner, Phoma) is empty.
+            EXCLUDE=""
             KB_SOURCES=("none" "internet")
             IMAGES=10  # override: use all 10 test images per class (only 2 classes)
             REF_DIR="CyberVisionAg/Prepared_Dataset/Coffee"

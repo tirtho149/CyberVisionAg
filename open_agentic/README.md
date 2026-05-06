@@ -222,10 +222,42 @@ All commands from `CyberVisionAg/`, with conda env `vl-reasoning` active and `.e
 
 ```bash
 python -m disease_registry.pipeline --crop CROP --track internet \
-  --disease-dir /path/to/raw/images
+  --disease-dir /path/to/folder_with/CROP_Diseases
 ```
 
-Produces `disease_registry/outputs/{Crop}/internet.xlsx`. Already done for: Soybean, Corn, Mango_Leaf, Tomato.
+Produces `disease_registry/outputs/{Crop}/internet.xlsx`. The pipeline reads class folder names under `<disease-dir>/<Crop>_Diseases/<class>/` and crawls the web for each. The class subfolders can be empty stubs — only their names are used.
+
+**Stub-folder trick** (when raw images live on a remote cluster but you only need class names locally):
+
+```bash
+mkdir -p /tmp/CROP_classes/CROP_Diseases
+for c in ClassA ClassB ClassC ...; do mkdir /tmp/CROP_classes/CROP_Diseases/$c; done
+python -m disease_registry.pipeline --crop CROP --track internet \
+  --disease-dir /tmp/CROP_classes
+```
+
+**Sanity-check the KB before moving on**:
+
+```bash
+python -c "
+import openpyxl
+wb = openpyxl.load_workbook('disease_registry/outputs/CROP/internet.xlsx', read_only=True)
+ws = wb.active
+print([r[0] for r in ws.iter_rows(min_row=2, values_only=True) if r[0]])
+"
+```
+
+If the row count is materially smaller than your class list (the old Coffee KB had 2 rows for 7 classes), the registry didn't find sources for some diseases. Either expand the class list, regenerate (often picks up more sources on a second pass), or note those classes in `EXCLUDE` until the KB is improved.
+
+**After regenerating, refresh the capsule's bundled KB** so the cluster prep uses the new one:
+
+```bash
+cp disease_registry/outputs/CROP/internet.xlsx open_agentic/capsuled_data_prep/kb/CROP/
+rsync -az open_agentic/capsuled_data_prep/kb/CROP/ \
+  <USER>@<HOST>:/work/<group>/<user>/sage/kb/CROP/
+```
+
+Already done for: Soybean, Corn, Mango_Leaf, Tomato, Coffee (regenerated 2026-05 with 7 rows; the original 2-row version excluded most classes from the eval).
 
 ### 2. Inspect raw data, decide exclude list
 
