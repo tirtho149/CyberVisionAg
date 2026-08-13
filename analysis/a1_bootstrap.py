@@ -87,28 +87,32 @@ def main():
         w = csv.DictWriter(fh, fieldnames=list(recs[0].keys())); w.writeheader()
         for r in recs: w.writerow({k: (("%.3f"%v) if isinstance(v, float) else v) for k, v in r.items()})
 
-    # ---- macro over the 4 headline crops, per k, with Holm across k ----
-    print("=== KB effect (internet vs none), macro over 4 headline crops, sonnet ===")
-    print(f"{'k':>3} {'macroΔ':>8} {'95% CI':>18} {'P(Δ>0)':>8} {'p_two':>8} {'p_holm':>8}  crops")
+    # ---- macro, EVERY cell vs the SINGLE fixed baseline (none, k=0) ----
+    # (paper convention: improvement over the per-crop k=0 no-KB baseline)
+    print("=== Improvement over the FIXED baseline (none, k=0), macro over 4 headline crops, sonnet ===")
+    print(f"{'cond':>9} {'k':>3} {'macroΔ':>8} {'95% CI':>18} {'P(Δ>0)':>8} {'p_two':>8} {'p_holm':>8}")
     macro_rows = []
-    for k in ks:
-        dbs, deltas, present = [], [], []
-        for crop in MAIN4:
-            a, b = paired(rows, crop, k, "internet", k, "none")
-            if len(a) == 0: continue
-            dbs.append(boot_delta(a, b)); deltas.append(a.mean()-b.mean()); present.append(crop.split("_")[0])
-        if not dbs: continue
-        macro_b = np.mean(np.vstack(dbs), axis=0)*100
-        md = float(np.mean(deltas))*100
-        lo, hi = np.percentile(macro_b, [2.5, 97.5])
-        p_two = 2*min((macro_b > 0).mean(), (macro_b < 0).mean())
-        macro_rows.append(dict(k=k, md=md, lo=lo, hi=hi,
-                               pg=float((macro_b > 0).mean()), pt=min(1.0, p_two),
-                               crops=",".join(present)))
+    for cond in ("none", "internet"):
+        for k in ks:
+            if cond == "none" and k == 0:
+                continue  # this IS the baseline (Δ=0 by definition)
+            dbs, deltas = [], []
+            for crop in MAIN4:
+                a, b = paired(rows, crop, k, cond, 0, "none")   # vs fixed (none,k0)
+                if len(a) == 0: continue
+                dbs.append(boot_delta(a, b)); deltas.append(a.mean()-b.mean())
+            if not dbs: continue
+            macro_b = np.mean(np.vstack(dbs), axis=0)*100
+            md = float(np.mean(deltas))*100
+            lo, hi = np.percentile(macro_b, [2.5, 97.5])
+            p_two = 2*min((macro_b > 0).mean(), (macro_b < 0).mean())
+            macro_rows.append(dict(cond=cond, k=k, md=md, lo=lo, hi=hi,
+                                   pg=float((macro_b > 0).mean()), pt=min(1.0, p_two)))
     padj = holm([r["pt"] for r in macro_rows])
     for r, pa in zip(macro_rows, padj):
-        print(f"{r['k']:>3} {r['md']:>+7.1f} {('[%+.1f,%+.1f]'%(r['lo'],r['hi'])):>18} "
-              f"{r['pg']:>8.3f} {r['pt']:>8.4f} {pa:>8.4f}  {r['crops']}")
+        star = "*" if pa < 0.05 else (" " if pa >= 0.10 else "~")
+        print(f"{r['cond']:>9} {r['k']:>3} {r['md']:>+7.1f} {('[%+.1f,%+.1f]'%(r['lo'],r['hi'])):>18} "
+              f"{r['pg']:>8.3f} {r['pt']:>8.4f} {pa:>8.4f} {star}")
 
     # ---- headline: full pipeline (internet,k=8) vs baseline (none,k=0) ----
     print("\n=== Headline: full pipeline (KB, k=8) vs baseline (no-KB, k=0), sonnet ===")
