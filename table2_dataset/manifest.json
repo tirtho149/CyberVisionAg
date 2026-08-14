@@ -1,0 +1,478 @@
+{
+  "name": "SAGE-WACV Table 2/3 dataset (open-model scaled study)",
+  "description": "Per-crop test + reference images and source-grounded KB for the open-model (Qwen3-VL-32B) evaluation reported in Table 2 (scaled_results) and Table 3 (kb_flip) of the SAGE WACV 2027 paper. 49 crops evaluated.",
+  "task": "Single-label plant-disease classification from one test image; prediction space = crop's disease classes.",
+  "layout": {
+    "images/": "flat pool of content-hashed image files (images/<sha1><ext>).",
+    "manifest/<crop>.json": "per-crop split: 'test'=[[hash,class],...]; 'ref'={source:{class:[hash,...]}}; 'classes'=[...]; 'ext'={hash:ext}; 'kb'/'part_index' pointers.",
+    "kb/<crop>/": "source-grounded knowledge base (internet.xlsx: per-class visual-symptom descriptions with citations).",
+    "part_index/<crop>.md": "anatomical organ->disease index (+ <crop>_sources.json citations).",
+    "classes/<crop>.txt": "class list."
+  },
+  "how_to_resolve_an_image": "path = images/<hash> + manifest[crop]['ext'][<hash>]  (e.g. images/10048c...e136.jpg).",
+  "evaluation_protocol": {
+    "model": "Qwen3-VL-32B-Instruct (vLLM, tool-parser=hermes)",
+    "methods": [
+      "zero_shot (k=0)",
+      "agentic (k=4, adaptive refs)",
+      "few_shot / static (k=4, fixed refs)"
+    ],
+    "kb_conditions": [
+      "none (no KB)",
+      "internet (source-grounded symptom KB + part index)"
+    ],
+    "metric": "top-1 accuracy per crop (correct = prediction==class).",
+    "results_location": "wacv2027/results_final/<crop>/<none|internet>/<zero_shot|agentic|few_shot>/k*/*.json"
+  },
+  "reproduction_steps": [
+    "1. For each crop, read manifest/<crop>.json; for each [hash,class] in 'test', resolve image via images/<hash><ext>.",
+    "2. Run method (zero_shot/agentic/few_shot). +KB prepends kb/<crop>/internet.xlsx symptom text + part_index/<crop>.md.",
+    "3. References (few_shot/agentic) = manifest['ref']['internet'][class] hashes.",
+    "4. correct = prediction==class; aggregate top-1 accuracy per crop.",
+    "5. Table 2 = zero-shot(k0) vs agentic(k4) vs static/few-shot(k4), no-KB vs +KB; Table 3 = the KB-hurts subset."
+  ],
+  "note": "Symlinks point into wacv2027/data/ (single copy; images already under the wacv directory). Table-2 k0 numbers use a per-crop merge with the spark INT4-AWQ run (spark_k0.json); k4 from this data.",
+  "crops": {
+    "apple": {
+      "classes": 7,
+      "num_test": 135,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "banana": {
+      "classes": 4,
+      "num_test": 80,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "bean": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "bell_pepper": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "blueberry": {
+      "classes": 4,
+      "num_test": 73,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "broccoli": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cabbage": {
+      "classes": 3,
+      "num_test": 50,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cabbage_kale": {
+      "classes": 2,
+      "num_test": 35,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "carrot": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cashew": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cassava": {
+      "classes": 4,
+      "num_test": 80,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cauliflower": {
+      "classes": 4,
+      "num_test": 73,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cherry": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "citrus": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "coffee": {
+      "classes": 4,
+      "num_test": 70,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "common_hop": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "corn": {
+      "classes": 27,
+      "num_test": 525,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "cucumber": {
+      "classes": 9,
+      "num_test": 180,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "durian": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "eggplant": {
+      "classes": 3,
+      "num_test": 57,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "fir": {
+      "classes": 2,
+      "num_test": 26,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "garlic": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "grape": {
+      "classes": 5,
+      "num_test": 100,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "lettuce": {
+      "classes": 7,
+      "num_test": 118,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "mango": {
+      "classes": 4,
+      "num_test": 79,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "maple": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "melon": {
+      "classes": 6,
+      "num_test": 118,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "oak": {
+      "classes": 6,
+      "num_test": 84,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "onion": {
+      "classes": 2,
+      "num_test": 26,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "peach": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "pepper": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "phlox": {
+      "classes": 2,
+      "num_test": 26,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "plum": {
+      "classes": 2,
+      "num_test": 34,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "potato": {
+      "classes": 6,
+      "num_test": 109,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "pumpkin": {
+      "classes": 3,
+      "num_test": 60,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "raspberry": {
+      "classes": 2,
+      "num_test": 29,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "rice": {
+      "classes": 8,
+      "num_test": 160,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "rose": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "soybean": {
+      "classes": 26,
+      "num_test": 514,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "spruce": {
+      "classes": 3,
+      "num_test": 43,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "squash": {
+      "classes": 5,
+      "num_test": 95,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "strawberry": {
+      "classes": 5,
+      "num_test": 92,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "sugarcane": {
+      "classes": 10,
+      "num_test": 183,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "tea": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "tobacco": {
+      "classes": 5,
+      "num_test": 100,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "tomato": {
+      "classes": 13,
+      "num_test": 250,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "vanilla": {
+      "classes": 2,
+      "num_test": 40,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "wheat": {
+      "classes": 8,
+      "num_test": 145,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    },
+    "zucchini": {
+      "classes": 4,
+      "num_test": 80,
+      "refs_per_class": 15,
+      "kb": [
+        "internet",
+        "none"
+      ]
+    }
+  }
+}
