@@ -1,0 +1,125 @@
+{
+  "name": "SAGE-WACV Table 4 dataset (in-depth agentic study, 7 crops)",
+  "description": "Apple-to-apple test + reference image sets for the 7-crop in-depth Claude agentic study reported in Table 4 (tab:main_results) of the SAGE WACV 2027 paper. Each test image is diagnosed to one disease class; the agent/few-shot methods may consult k reference images per class plus a source-grounded internet knowledge base.",
+  "task": "Single-label plant-disease classification from one test image. Prediction space = the crop's disease classes (folder names under test/).",
+  "layout": "table4_dataset/<Crop>/test/<Class>/<img>.jpg , /reference/<Class>/<img>.jpg , /kb/ (per-crop knowledge base)",
+  "label_convention": "ground-truth class = the <Class> folder the test image sits in.",
+  "crops": {
+    "Soybean": {
+      "num_classes_test": 25,
+      "num_test_images": 74,
+      "num_reference_images": 242,
+      "test_source": "github@new-crop",
+      "reference_dir_source": "Soybean"
+    },
+    "Corn": {
+      "num_classes_test": 30,
+      "num_test_images": 88,
+      "num_reference_images": 274,
+      "test_source": "github@new-crop",
+      "reference_dir_source": "Corn"
+    },
+    "Mango": {
+      "num_classes_test": 4,
+      "num_test_images": 40,
+      "num_reference_images": 35,
+      "test_source": "github@new-crop",
+      "reference_dir_source": "Mango_Leaf"
+    },
+    "Tomato": {
+      "num_classes_test": 19,
+      "num_test_images": 88,
+      "num_reference_images": 145,
+      "test_source": "TEST=exact Table-4 evaluated ids (results); REFERENCE=github new-crop Tomato dir (19 evaluated classes)",
+      "reference_dir_source": "Prepared_Dataset/Tomato (github new-crop)"
+    },
+    "Rice": {
+      "num_classes_test": 8,
+      "num_test_images": 40,
+      "num_reference_images": 60,
+      "test_source": "desktop",
+      "reference_dir_source": "Rice"
+    },
+    "Potato": {
+      "num_classes_test": 9,
+      "num_test_images": 45,
+      "num_reference_images": 95,
+      "test_source": "desktop",
+      "reference_dir_source": "Potato"
+    },
+    "Banana": {
+      "num_classes_test": 7,
+      "num_test_images": 35,
+      "num_reference_images": 57,
+      "test_source": "desktop",
+      "reference_dir_source": "Banana"
+    }
+  },
+  "evaluation_protocol": {
+    "model": "Claude Sonnet (paper also reports Haiku/Opus tiers)",
+    "methods": [
+      "zero_shot (k=0)",
+      "agentic (adaptive reference selection)",
+      "few_shot (fixed k exemplars)"
+    ],
+    "reference_budgets_k": [
+      0,
+      1,
+      4,
+      8
+    ],
+    "kb_conditions": [
+      "none (no KB)",
+      "internet (source-grounded symptom KB + anatomical part-index)"
+    ],
+    "metric": "top-1 accuracy per crop; mean improvement over the no-KB k=0 baseline",
+    "reference_usage": "references are drawn from reference/<Class>/ (organ-tagged); the k images shown are selected per method."
+  },
+  "reproduction_steps": [
+    "1. For each crop, for each test image under test/<Class>/, run the diagnosis method (zero_shot / few_shot / agentic).",
+    "2. +KB runs prepend the crop's internet KB (symptom descriptions + anatomical part index) \u2014 see kb_source below.",
+    "3. Reference images (few_shot/agentic) come from reference/<Class>/.",
+    "4. correct = (prediction == <Class> folder name). Aggregate top-1 accuracy per crop.",
+    "5. Table-4 numbers = Claude Sonnet, internet KB, k in {0,1,4,8}."
+  ],
+  "kb_source": "Self-contained: each crop's kb/ folder (copied from SAGE disease_registry/outputs + Prepared_Dataset). internet.xlsx present for all 7 crops.",
+  "frozen_split": "wacv2027/table4_apple2apple_split.json (exact per-image filenames)",
+  "provenance": {
+    "Soybean/Corn/Mango/Tomato": "test filenames = exact ids evaluated in SAGE results/open_agentic (Table-4 numbers reproduce); reference images from github.com/tirtho149/SAGE @ new-crop branch Prepared_Dataset (git-LFS).",
+    "Rice/Potato/Banana": "Desktop SAGE/Prepared_Dataset (newer experiments)."
+  },
+  "known_gaps": {
+    "Tomato_test_images": "The exact 88 evaluated Tomato test images draw from mixed sources (Bugwood/CDDM/New_Plant_Di/LeafNet) and are only partially present on disk; filenames are frozen in the split JSON but some image files could not be recovered. Tomato reference set IS complete (145 imgs, 19 classes)."
+  },
+  "kb_per_crop": {
+    "location": "table4_dataset/<Crop>/kb/",
+    "internet.xlsx": "the +KB symptom descriptions per disease class (source-grounded, with citations) \u2014 used by the internet-KB runs.",
+    "part_index.md / part_index.json": "anatomical organ -> disease-class index (candidate narrowing prior).",
+    "registry.md / final_registry.json": "structured disease registry (where present).",
+    "metadata.json": "split provenance (seed, ref/test quotas, per-class counts).",
+    "tags.csv": "per-image organ/quality tags."
+  },
+  "self_contained": true,
+  "verification": {
+    "references_complete": "ALL 7 crops 100%",
+    "kb_complete": "ALL 7 crops",
+    "test_counts": {
+      "Soybean": "73/74",
+      "Corn": "87/88",
+      "Mango": "40/40",
+      "Tomato": "88/88",
+      "Rice": "40/40",
+      "Banana": "35/35",
+      "Potato": "45/45"
+    },
+    "fully_complete_crops": [
+      "Mango",
+      "Tomato",
+      "Rice",
+      "Banana",
+      "Potato"
+    ],
+    "recovered_from_CyAg": "Tomato test fully recovered (49/49) via CyAg selected_10_crops + Curated_Bugwood_Dataset (exact class+filename); Corn +1 (Crazy_Top/Corn_Disease_71).",
+    "residual_missing": "RESOLVED: added per user. NOTE \u2014 Soybean_Dise_136 and Corn_Disease_202 were sourced by filename from a DIFFERENT class folder (same-name-different-class; exact evaluated image not preserved). Provenance-uncertain for these 2."
+  }
+}
